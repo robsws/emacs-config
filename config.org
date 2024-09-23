@@ -1,0 +1,1473 @@
+#+title: rostre's emacs configuration
+#+PROPERTY: header-args:emacs-lisp :tangle ./init.el
+
+My emacs configuration. A lot of this is heavily inspired/directly copied from [[https://github.com/daviwil/emacs-from-scratch][daviwil's emacs-from-scratch]] repository and [[https://www.youtube.com/playlist?list=PLEoMzSkcN8oPH1au7H6B7bBJ4ZO7BXjSZ][series of videos]] which I seriously recommend watching for beginners to Emacs.
+ 
+* prerequisites
+
+Various things need installing external to this configuration before it'll all work. It's recommended to install them before running this config.
+
+- [[https://github.com/be5invis/Iosevka][Iosevka font files]], particularly the monospace font "Iosevka".
+- For the copilot stuff to work, follow the instructions at [[https://github.com/copilot-emacs/copilot.el][the copilot-emacs repo]].
+- To use the LSP functionality with =eglot=, the LSP servers must be installed. See "lsp servers" below.
+- =vterm= won't work unless =libtool= and =cmake= are installed to the OS.
+- On Mac, =coreutils= needs to be installed in the OS before =gls= can be used. =gls= is the GNU ls, which is just "ls" on gnu/linux systems.
+- =curl= is a requirement for =ob-http= to work.
+
+** lsp servers
+
+The python LSP server is [[https://emacs-lsp.github.io/lsp-mode/page/lsp-pylsp/][pylsp]]. I use the =black= formatter to style the code.
+
+#+begin_src shell
+
+  pip install 'python-lsp-server[all]'
+  pip install pylsp-black
+
+#+end_src
+
+Rust requires =rust-analyzer=. That can be downloaded and compiled from source like this:
+
+#+begin_src shell
+
+  $ git clone https://github.com/rust-analyzer/rust-analyzer.git -b release
+  $ cd rust-analyzer
+  $ cargo xtask install --server # will install rust-analyzer into $HOME/.cargo/bin
+
+#+end_src
+
+* postrequisites
+
+Here's some things that might need to be done after the config has finished loading.
+
+- You might need to run =M-x all-the-icons-install-fonts=. This is supposedly to be dealt with by the elisp written alongside usage of the =all-the-icons= package but I'm not 100% sure it works.
+- Run =(mapc #'treesit-install-language-grammar (mapcar #'car treesit-language-source-alist))= to install all of the tree-sitter grammars. This only needs to be done once.
+
+* troubleshooting
+
+Sometimes elpaca reports an error for some packages on first load: "Cannot determine url from recipe". The solution to this problem is just to delete the elpaca cache files in =~/emacs-conf/elpaca/cache= and restart emacs.
+
+* bootstraps
+
+This represents the most basic stuff needed to get a simple functional Emacs instance online. I don't want everything from work at home and vice versa.
+
+** lexical binding
+
+Lexical binding (or static binding) allows for scoped variables, rather than all variables being global. This makes things like closures possible.
+
+#+begin_src emacs-lisp
+;; -*- lexical-binding: t; -*-
+#+end_src
+
+The =-*-= syntax makes the variable setting of =lexical-binding= into a [[https://www.emacswiki.org/emacs/FileLocalVariables][file-local variable]], which means that anything configured inside is only configured for that file. In this case it's a good way of turning on lexical binding for the entire init.el file.
+
+** configuration flags/variables
+
+A list of switches for turning things on and off.
+
+** configuration tangling
+
+"Tangling" takes all org-babel code sections out of an org-mode file, concatenates them together, and exports them to a separate file. In this case I use it to export all of the configuration from here into a plain elisp file so that Emacs can run it on startup.
+
+The function below checks if the file visited is the literate config file (this one!) and then if it is, runs =org-babel-tangle= bypassing the confirmation message.
+
+=org-babel-tangle= itself will actually use the file properties in order to determine how to tangle the various code blocks. It is specified as =#+PROPERTY: header-args:emacs-lisp :tangle ./basics.el=, which means "tangle all emacs-lisp code blocks together into the file basics.el". It is also possible to specify only specific code blocks to tangle, but this is more convenient.
+
+#+begin_src emacs-lisp
+
+  (setq this-config-org-file "~/emacs-config/config.org")
+
+  (defun rostre/org-babel-tangle-config ()
+    (when (string-equal (buffer-file-name)
+                        (expand-file-name this-config-org-file))
+      (let ((org-confirm-babel-evaluate nil))
+        (org-babel-tangle))))
+
+#+end_src
+
+Now I add a hook to =org-mode= that will run this function every time an =org= file is saved. It'll only actually do anything if visiting this file though.
+
+#+begin_src emacs-lisp
+
+  (add-hook 'org-mode-hook
+            (lambda ()
+              (add-hook 'after-save-hook #'rostre/org-babel-tangle-config)))
+
+#+end_src
+
+** package management
+
+I will use [[https://github.com/progfolio/elpaca][elpaca]] for package management instead of the default =package.el= as it offers some quality-of-life upgrades, and the ability to install packages directly from their source repositories asynchronously, i.e. without blocking the main emacs thread. It also supports MELPA out of the box.
+
+Firstly, disable the built in package.el as we no longer need it. This has to be tangled into the =early-init.el= file, otherwise =package.el= is still loaded.
+
+#+begin_src emacs-lisp :tangle ./early-init.el
+
+  (setq package-enable-at-startup nil)
+
+#+end_src
+
+ The following code is all copy-pasted from the setup guide for elpaca.
+
+#+begin_src emacs-lisp
+
+  (defvar elpaca-installer-version 0.7)
+  (defvar elpaca-directory (expand-file-name "elpaca/" user-emacs-directory))
+  (defvar elpaca-builds-directory (expand-file-name "builds/" elpaca-directory))
+  (defvar elpaca-repos-directory (expand-file-name "repos/" elpaca-directory))
+  (defvar elpaca-order '(elpaca :repo "https://github.com/progfolio/elpaca.git"
+                                :ref nil :depth 1
+                                :files (:defaults "elpaca-test.el" (:exclude "extensions"))
+                                :build (:not elpaca--activate-package)))
+  (let* ((repo  (expand-file-name "elpaca/" elpaca-repos-directory))
+         (build (expand-file-name "elpaca/" elpaca-builds-directory))
+         (order (cdr elpaca-order))
+         (default-directory repo))
+    (add-to-list 'load-path (if (file-exists-p build) build repo))
+    (unless (file-exists-p repo)
+      (make-directory repo t)
+      (when (< emacs-major-version 28) (require 'subr-x))
+      (condition-case-unless-debug err
+          (if-let ((buffer (pop-to-buffer-same-window "*elpaca-bootstrap*"))
+                   ((zerop (apply #'call-process `("git" nil ,buffer t "clone"
+                                                   ,@(when-let ((depth (plist-get order :depth)))
+                                                       (list (format "--depth=%d" depth) "--no-single-branch"))
+                                                   ,(plist-get order :repo) ,repo))))
+                   ((zerop (call-process "git" nil buffer t "checkout"
+                                         (or (plist-get order :ref) "--"))))
+                   (emacs (concat invocation-directory invocation-name))
+                   ((zerop (call-process emacs nil buffer nil "-Q" "-L" "." "--batch"
+                                         "--eval" "(byte-recompile-directory \".\" 0 'force)")))
+                   ((require 'elpaca))
+                   ((elpaca-generate-autoloads "elpaca" repo)))
+              (progn (message "%s" (buffer-string)) (kill-buffer buffer))
+            (error "%s" (with-current-buffer buffer (buffer-string))))
+        ((error) (warn "%s" err) (delete-directory repo 'recursive))))
+    (unless (require 'elpaca-autoloads nil t)
+      (require 'elpaca)
+      (elpaca-generate-autoloads "elpaca" repo)
+      (load "./elpaca-autoloads")))
+  (add-hook 'after-init-hook #'elpaca-process-queues)
+  (elpaca `(,@elpaca-order))
+
+#+end_src
+
+I will also use the =use-package= tool to configure packages through the rest of this configuration. This just makes it much more convenient to configure packages with elisp.
+
+#+begin_src emacs-lisp
+
+  (elpaca elpaca-use-package
+    (elpaca-use-package-mode))
+
+#+end_src
+
+One thing to configure on =use-package= is that we always want to download packages if they don't already exist on the system. That can be configured by always setting =ensure=.
+
+#+begin_src emacs-lisp
+
+  (setq use-package-always-ensure t)
+
+#+end_src
+
+This however does not keep packages up to date, so it's important to do that manually from time to time to fix the issues that arise as a result.
+
+I could instead choose to install the packages manually and then commit my whole =.emacs.d= directory to source control as a way to keep it stable. This would lead to a large amount of code being lugged around between systems though. Ideally there would be a way to lock the versions in place until I decided to upgrade them deliberately, but elpaca does not support lockfiles at the moment.
+
+** modifier keys for mac
+
+If on mac, assign =s= (super) key to Option and assign =M= (meta) key to Cmd.
+
+#+begin_src emacs-lisp
+
+  (when (eq system-type 'darwin)
+    (progn
+      (setq mac-option-key-is-meta nil)
+      (setq mac-option-modifier 'super)
+      (setq mac-command-key-is-meta t)
+      (setq mac-command-modifier 'meta)))
+
+#+end_src
+
+** key bindings
+
+The =general= package makes it very easy to set up plenty of custom key bindings and override existing ones if necessary. I set it up here so that I can define key bindings as I go through this configuration.
+
+I have one key binding to set up here - =M-o= for switching windows. I always forget to use it over =C-x o= though.
+
+#+begin_src emacs-lisp
+
+  (use-package general
+    :ensure (:wait t) ;; wait as we use general.el throughout the rest of the config
+    :config (general-define-key "M-o" 'other-window))
+
+#+end_src
+
+It's also useful to set up =repeat-mode= so that you can repeat common chords with single key presses. The default ones that are available are pretty useful in themselves.
+
+#+begin_src emacs-lisp
+
+  (repeat-mode)
+
+#+end_src
+
+Another nice to have when typing key chords is =which-key=, which provides a help popup when a partial chord is entered that gives you a list of options of what keys can follow.
+
+#+begin_src emacs-lisp
+
+  (use-package which-key
+    :diminish which-key-mode
+    :config
+    (setq which-key-idle-delay 0.3)
+    (which-key-mode))
+
+#+end_src
+
+* theming
+
+This contains all the colour, font, and general settings for making Emacs look pretty.
+
+** fonts
+
+Set up the default, fixed-pitch (monospace) and variable-pitch (non-monospace) fonts for emacs.
+
+#+begin_src emacs-lisp
+
+  (if (eq system-type 'darwin)
+      (setq rostre/font-size 140)
+    (setq rostre/font-size 120))
+
+  (set-face-attribute 'default nil
+                      :font "Iosevka"
+                      :height rostre/font-size)
+
+  (set-face-attribute 'fixed-pitch nil
+                      :font "Iosevka"
+                      :height rostre/font-size)
+
+  (set-face-attribute 'variable-pitch nil
+                      :font "Iosevka"
+                      :height rostre/font-size)
+
+#+end_src
+
+We can customize specific font-faces for certain contexts as well. Mainly this is useful in org-mode for making the headings larger.
+
+#+begin_src emacs-lisp
+
+  (defun rostre/org-faces ()
+	(set-face-attribute 'org-document-title nil :height 1.4)
+	(set-face-attribute 'org-todo nil :height 1.0)
+	(set-face-attribute 'org-level-1 nil :height 1.3)
+	(set-face-attribute 'org-level-2 nil :height 1.2)
+	(set-face-attribute 'org-level-3 nil :height 1.2)
+	(set-face-attribute 'org-level-4 nil :height 1.2)
+	(set-face-attribute 'org-level-5 nil :height 1.2)
+	(set-face-attribute 'org-level-6 nil :height 1.2))
+
+  (add-hook 'org-mode-hook 'rostre/org-faces)
+
+#+end_src
+
+** frame layout
+
+Remove the title bar and scrollbars to maximise the amount of buffer space. I never use them and try to focus on keyboard use rather than mouse use.
+
+#+begin_src emacs-lisp
+
+  ;; Remove title bar on Mac
+  (when (eq system-type 'darwin)
+    (add-to-list 'default-frame-alist '(undecorated-round . t)))
+
+  ;; Remove UI cruft
+  (tool-bar-mode -1)
+  (menu-bar-mode -1)
+  (toggle-scroll-bar -1)
+
+#+end_src
+
+** buffer layout
+
+Turn on line and column number rulers for prog-mode buffers.
+
+#+begin_src emacs-lisp
+
+  (add-hook 'prog-mode-hook 'display-line-numbers-mode)
+
+#+end_src
+
+I also use =breadcrumb= which adds a title bar that shows which sub-block we're inside in the current file.
+
+#+begin_src emacs-lisp
+
+  (use-package breadcrumb
+    :config
+    (breadcrumb-mode))
+
+#+end_src
+
+In org-mode buffers that use =org-indent-mode=, it's useful to have bars that indicate which block belongs to which. The =org-bars= package provides those, colour-coded to the headers.
+
+The =:ensure= section allows the package to be directly installed from a github repository, as it's not available on one of the common package distributors like MELPA or ELPA.
+
+#+begin_src emacs-lisp
+
+  (use-package org-bars
+    :if (eq system-type 'gnu/linux) ;; it's not rendering properly on mac
+    :ensure (:host github :repo "https://github.com/tonyaldon/org-bars")
+    :hook (org-mode . org-bars-mode))
+
+#+end_src
+
+** colours
+
+Load a general colour theme. I've gone for "timu-rouge" from MELPA.
+
+#+begin_src emacs-lisp
+
+  (use-package timu-rouge-theme
+    :config (load-theme 'timu-rouge t))
+
+#+end_src
+
+** transparency
+
+If I'm on linux and I have proper window tiling, get a bit fancy and put window transparency on.
+
+#+begin_src emacs-lisp
+
+  (when (eq system-type 'gnu/linux)
+    (progn
+      (set-frame-parameter (selected-frame) 'alpha '(95 . 95))
+      (add-to-list 'default-frame-alist '(alpha . (95 95)))))
+
+#+end_src
+
+** icons
+
+The =all-the-icons= package includes a bunch of icons to be used with various other emacs packages, such as dired for icons that depict the type of file in the listing.
+
+#+begin_src emacs-lisp
+
+  (use-package all-the-icons
+    :init
+    (setq all-the-icons-was-installed (not (elpaca-installed-p 'all-the-icons)))
+    :config
+    (when all-the-icons-was-installed
+      (all-the-icons-install-fonts)))
+
+#+end_src
+
+** modeline
+
+The modeline is the bar along the bottom of an emacs buffer that gives various information about that buffer, including the current major mode and name of the buffer.
+
+=keycast= shows the last keybinding that was used, along with the function that it called. It can be quite useful for figuring out what a particular key binding does so that you can represent it in elisp.
+
+#+begin_src emacs-lisp
+
+  (use-package keycast
+    :config (keycast-mode-line-mode))
+
+#+end_src
+
+** formatting
+
+The =helpful= package provides some formatting for the help files so that they are easier to read. We remap a bunch of the 'describe' functions to use =helpful= instead.
+
+#+begin_src emacs-lisp
+
+  (use-package helpful
+    :bind
+    ([remap describe-function] . describe-function)
+    ([remap describe-command] . helpful-command)
+    ([remap describe-variable] . describe-variable)
+    ([remap describe-key] . helpful-key))
+
+#+end_src
+
+* editing
+
+This section contains configuration for a bunch of tools that help primarily moving around and between emacs buffers quickly and efficiently.
+
+** search and completions
+
+A number of packages work together to provide auto-completion menus for many other utilities in emacs. These packages are =vertico=, =consult=, =orderless=, =marginalia=. I'll now install all of these and explain what they do.
+
+=vertico= provides a UI for search results in an information-rich vertical list. This can kick in any situation that requires a menu particularly for completions of some partially typed text, such as =M-x= or =find-file=. =vertico-cycle= enables going off the bottom of the list and starting back at the top.
+
+#+begin_src emacs-lisp
+
+  (use-package vertico
+    :config
+    (setq vertico-cycle t)
+    (vertico-mode))
+
+#+end_src
+
+=consult= provides some search and navigation commands and some better alternatives to in-built emacs tools. I set up bindings here specifically for a few of it's features:
+
+- =consult-line= is useful for searching whole buffers and seeing all of the matches in a =vertico= list.
+- =consult-buffer= is a better alternative to =switch-to-buffer= that groups buffers into sections and can open files that don't actually have open buffers yet.
+- =consult-ripgrep= invokes the =ripgrep= tool that searches the content of entire directories for a search term in a flash.
+- =consult-outline= provides a list of the headings or signatures in a file to navigate about quickly.
+
+#+begin_src emacs-lisp
+
+  (use-package consult
+    :config
+    (general-define-key "s-s" 'consult-line
+                        "C-x b" 'consult-buffer
+                        "C-c g" 'consult-ripgrep
+                        "C-c o" 'consult-outline))
+
+#+end_src
+
+=orderless= provides enhanced search for =vertico=, allowing you to put in search terms separated by spaces that can be out of order from how they appear in the search results. It's particularly useful if I can't remember if it's =replace-string= or =string-replace=. There are a few additional configuration options suggested in the source repository to make sure that completions are available even if dynamic completion tables are required, and to allow more sophisticated completions like =/u/s/l= for =/usr/share/local=.
+
+#+begin_src emacs-lisp
+
+  (use-package orderless
+    :config
+    (setq completion-styles '(orderless basic))
+    (setq completion-category-overrides '((file (styles basic partial-completion)))))
+
+#+end_src
+
+=marginalia= provides rich detail about the search results that are populated in =vertico=.
+
+#+begin_src emacs-lisp
+  
+  (use-package marginalia
+    :after vertico
+    :config
+    (setq marginalia-annotators '(marginalia-annotators-heavy marginalia-annotators-light nil))
+    (marginalia-mode))
+
+#+end_src
+
+=corfu= and =cape= together provide the front and back-end respectively for in-buffer code completions. We allow cycling from end to start like with =vertico=, set it to automatically try to complete without any additional key presses, and allow previewing of the term at point.
+
+If inside a buffer, we want to include a space in the search term for the completion, we can use =s-SPC= to add a space without breaking the current search term.
+
+#+begin_src emacs-lisp
+
+  (use-package corfu
+    :bind
+    ;; use super-Space to use orderless search in corfu completions
+    (:map corfu-map ("s-SPC" . corfu-insert-separator))
+    :config
+    (corfu-cycle t) ;; cycle selection box
+    (corfu-auto t) ;; automatically try to complete
+    (corfu-preview-current t)
+    (global-corfu-mode)
+    (corfu-popupinfo-mode))
+
+  (use-package cape)
+
+#+end_src
+
+** frame navigation
+
+=avy= provides some useful functions for hopping around the whole emacs frame based on a search string. This usage is heavily inspired by [[https://karthinks.com/software/avy-can-do-anything/#avy-plus-embark-any-action-anywhere][this fantastic Karthinks article on avy]] which suggests using =avy-goto-char-timer= to move around emacs, in combination with =embark-act= to then do things at that point in the window without even moving the cursor.
+
+=embark= allows some standard actions to be performed directly in certain contexts, such as in a =vertico= menu or at an =avy= target. This means that things can be accomplished with a selection without even visiting the target. =embark-consult= provides some integration with the =consult= package.
+
+I've written a custom action that operates on the =org-agenda= and allows clocking in or changing the status of an org TODO item in the agenda without actually moving the cursor to it.
+
+#+begin_src emacs-lisp
+
+  (use-package embark
+    :config
+    (general-define-key "C-." 'embark-act)
+    
+    (defvar-keymap embark-org-agenda-heading-map
+      :doc "Keymap for org-agenda view actions"
+      :parent embark-general-map
+      "t" #'org-agenda-todo
+      "i" #'org-agenda-clock-in))
+
+  (use-package embark-consult)
+
+#+end_src
+
+We need to explicitly link up =avy= with =embark=, first by specifying an =avy= action.
+
+#+begin_src emacs-lisp
+
+  (defun avy-action-embark (pt)
+    (unwind-protect
+        (save-excursion
+          (goto-char pt)
+          (embark-act))
+      (select-window
+       (cdr (ring-ref avy-ring 0))))
+    t)
+
+#+end_src
+
+There are a couple of other useful =avy= actions we can set up which mark a region from point to the target or show help at the target.
+
+#+begin_src emacs-lisp
+
+  (defun avy-action-mark-to-char (pt)
+    (activate-mark)
+    (goto-char pt))
+
+  (defun avy-action-helpful (pt)
+    (save-excursion
+      (goto-char pt)
+      (helpful-at-point))
+    (select-window
+     (cdr (ring-ref avy-ring 0)))
+    t)
+
+#+end_src
+
+We can now install =avy= and register all the above actions we've defined with it.
+
+#+begin_src emacs-lisp
+
+  (use-package avy
+    :config
+    (general-define-key "C-;" 'avy-goto-char-timer)
+    (setf (alist-get ?. avy-dispatch-alist) 'avy-action-embark
+	  (alist-get ?k avy-dispatch-alist) 'avy-action-kill-stay
+	  (alist-get ?w avy-dispatch-alist) 'avy-action-copy
+	  (alist-get ?y avy-dispatch-alist) 'avy-action-yank
+	  (alist-get ?M avy-dispatch-alist) 'avy-action-mark-to-char
+	  (alist-get ?H avy-dispatch-alist) 'avy-action-helpful))
+
+#+end_src
+
+*** custom frame navigation
+
+These are some frame navigation functions I cooked up myself.
+
+I override the default split-window functions with my own versions that also change focus to the new window.
+
+#+begin_src emacs-lisp
+
+  (defun rostre/split-window-right ()
+    (interactive)
+    (select-window (split-window-right)))
+
+  (general-define-key "C-x 3" 'rostre/split-window-right)
+
+  (defun rostre/split-window-below ()
+    (interactive)
+    (select-window (split-window-below)))
+
+  (general-define-key "C-x 2" 'rostre/split-window-below)
+
+#+end_src
+
+** custom editing
+
+This is a collection of functions that I've created to make my own editing easier.
+
+These two functions delete whitespace from point to the next non-whitespace character, either backwards or forwards. This is something I commonly find myself doing manually when coding particularly, as =M-d= or =M-<backspace>= end up deleting some text along with the whitespace I wanted to clear.
+
+#+begin_src emacs-lisp
+
+  (defun rostre/delete-whitespace-backwards ()
+    "Delete all of the whitespace before point"
+    (interactive)
+    (save-excursion
+      (setq-local end-loc (point))
+      (re-search-backward "[^\s\n\t]")
+      (forward-char)
+      (delete-region (point) end-loc)))
+
+  (general-define-key "s-<backspace>" 'rostre/delete-whitespace-backwards)
+
+  (defun rostre/delete-whitespace-forwards ()
+    "Delete all of the whitespace before point"
+    (interactive)
+    (save-excursion
+      (setq-local start-loc (point))
+      (re-search-forward "[^\s\n\t]")
+      (forward-char)
+      (delete-region start-loc (point))))
+
+  (general-define-key "s-d" 'rostre/delete-whitespace-forwards)
+
+#+end_src
+
+** quality of life
+
+A few settings that make for smoother use of emacs.
+
+First change the yes/no prompt to a y/n prompt, as it's faster to type.
+
+#+begin_src emacs-lisp
+
+  (defalias 'yes-or-no-p 'y-or-n-p)
+
+#+end_src
+
+Automatically "revert" (reload) buffers from file when they change.
+
+#+begin_src emacs-lisp
+
+  (global-auto-revert-mode 1)
+  (setq global-auto-revert-non-file-buffers t)
+
+#+end_src
+
+Save the minibuffer history so that we can rerun =M-x= commands particularly from the recent history.
+
+#+begin_src emacs-lisp
+
+  (setq history-length 25)
+  (savehist-mode 1)
+
+#+end_src
+
+By default, emacs leaves a ton of temporary files all over the place, which can be a bit of a pain. We can redirect all of those files to a single directory so that they stay out of the way.
+
+#+begin_src emacs-lisp
+
+  (when (not (file-directory-p "~/.emacs-backup-files"))
+	(make-directory "~/.emacs-backup-files/"))
+  (setq temporary-file-directory "~/.emacs-backup-files/")
+  (setq backup-directory-alist
+    `((".*" . ,temporary-file-directory)))
+  (setq auto-save-file-name-transforms
+    `((".*" ,temporary-file-directory t)))
+
+#+end_src
+
+** key bindings
+
+There's a few navigation/editing functions I have bound in the =C-c= space for easy access.
+- =C-c c= jumps directly to my emacs config file.
+- =C-c r= re-evaluates my whole config file.
+- =C-c w= cycles the windows around in the frame.
+
+#+begin_src emacs-lisp
+
+  (general-define-key :prefix "C-c"
+                      "c" (lambda () (interactive) (find-file "~/emacs-conf/config.org"))
+                      "r" (lambda () (interactive) (load-file "~/emacs-conf/init.el"))
+                      "w" 'window-swap-states)
+
+#+end_src
+
+* source control
+
+I use =magit= for all my git needs these days. It is a key-driven interface to git that uses the =transient= module to show all the possible commands and the key bindings for them.
+
+First install the =transient= and =seq= packages as magit depends on those.
+
+#+begin_src emacs-lisp
+
+  (use-package seq)
+  (use-package transient
+    :after 'seq)
+  
+#+end_src
+
+Now install magit, with an extra configuration line to display the magit status buffer in the same window as the cursor.
+
+#+begin_src emacs-lisp
+
+  (use-package magit
+    :after transient seq
+    :custom
+    (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1))
+
+#+end_src
+
+* note taking
+
+** org-mode
+
+There's some basic set-up to do with org-mode before we starting augmenting it with packages such as Denote.
+
+Firstly, I want org mode to use variable-pitch (i.e. non-monospace) fonts and =visual-line-mode=, which wraps the text onto a new line rather than making it extend out of the visible window. I also enable =org-indent-mode= that indents the blocks of text based on their parent header nesting level. To do all this, I specify a function that will be called as a hook when org-mode is invoked. This means that these commands will only be invoked when opening org-mode files.
+
+#+begin_src emacs-lisp
+
+  (defun rostre/org-buffer-setup ()
+    (variable-pitch-mode 1)
+    (visual-line-mode 1)
+    (org-indent-mode))
+
+#+end_src
+
+We can set up the hook using =add-hook=. Now all of the above commands will run when a buffer is opened with org-mode.
+
+#+begin_src emacs-lisp
+  
+  (add-hook 'org-mode-hook 'rostre/org-buffer-setup)
+
+#+end_src
+
+Now we can get into the nitty-gritty of configuration. There's a few aesthetic things to sort out - making the ellipses look nicer, make sure empty lines are shown when headers are collapsed, and make sure images are scaled to the window. I also hide /emphasis/ *markers* to make the text nicer to read.
+
+#+begin_src emacs-lisp
+
+  (setq org-ellipsis " ⮠")
+  (setq org-cycle-separator-lines -1)
+  (setq org-image-actual-width nil)
+  (setq org-hide-emphasis-markers t)
+  
+#+end_src
+
+There are also a few things to set up with how TODO items are handled.
+
+We want the timestamp saved when a TODO is marked done:
+
+#+begin_src emacs-lisp
+
+  (setq org-log-done 'time)  
+
+#+end_src
+
+We want the logbook with the timestamps saved in the drawer section under the heading:
+
+#+begin_src emacs-lisp
+
+  (setq org-log-into-drawer t)  
+
+#+end_src
+
+We want to customise the TODO states:
+
+#+begin_src emacs-lisp
+
+  (setq org-todo-keywords
+        '((sequence "TODO(t)" "RVEW(n!)" "WAIT(w@/!)" "|" "DONE(d!)" "CANC(c@)")))  
+
+#+end_src
+
+We want to allow for 5 levels of priority:
+
+#+begin_src emacs-lisp
+ 
+  (setq org-priority-highest ?A)
+  (setq org-priority-lowest ?E)
+
+#+end_src
+
+We can also customise the tags that can be added to tasks here.
+
+#+begin_src emacs-lisp
+
+  (setq org-tag-alist '())
+
+#+end_src
+
+=org-download= allows images to be pasted in org-mode buffers.
+
+#+begin_src emacs-lisp
+
+  (use-package org-download
+    :config
+    (general-define-key "C-c y" 'org-download-clipboard))
+
+#+end_src
+
+=org-store-link= is a very useful function that generates a link to the current heading in an org-mode buffer, or even a location in any other buffer, and stores that to a register that can later be recalled with =org-insert-link=, which is bound to =C-c C-l=.
+
+#+begin_src emacs-lisp
+
+  (general-define-key "C-c q" 'org-store-link)
+
+#+end_src
+
+** journalling 
+
+My journalling setup uses a single org file for all notes, which have tags and properties such that they can be searched and filtered with =org-match-sparse-tree= and =org-agenda=.
+
+The following code adds the =CREATED= property to every new heading automatically, so that notes can be filtered by when they were created.
+
+#+begin_src emacs-lisp
+
+  (defun rostre/set-creation-date-property-on-new-heading ()
+    (save-excursion
+      (org-back-to-heading)
+      (org-set-property "CREATED" (format-time-string "[%Y-%m-%d %T]"))))
+
+  (add-hook 'org-insert-heading-hook #'rostre/set-creation-date-property-on-new-heading)
+
+#+end_src
+
+** denote
+
+=denote= is a package that allows the quick creation of new note files that are stored with predictable filenames and metadata such that they can be easily searched. This is good for storing a knowledge base.
+
+All of my =denote= bindings are prefixed with =C-c d=.
+
+#+begin_src emacs-lisp
+
+  (use-package denote
+    :ensure (:wait t) ;; wait so that denote functions can be referenced later
+    :config
+    ;; Key bindings
+    (general-define-key :prefix "C-c d"
+                        "n" 'denote
+                        "c" 'rostre/capture-to-denote
+                        "l" 'denote-link
+                        "o" 'denote-link-after-creating
+                        "f" 'consult-notes))
+
+#+end_src
+
+The following are a list of templates with which to initialise the body of a new denote note with. Mostly I use the "project" and "journal" ones here, although the "normal" one is useful for initialising adhoc notes with no headings.
+
+#+begin_src emacs-lisp
+
+  (setq denote-templates
+    `(
+      (normal . "")
+      ;; A metanote is a collection of links to other notes
+      (metanote . ,(concat "* links"
+               "\n\n"))
+      ;; A project is a collection of TODO tasks.
+      (project . ,(concat "* tasks\n\n"
+                          "* diary\n\n"
+                          "* notes\n\n"
+                          "* reminders\n\n"))))
+
+#+end_src
+
+The denote prompts are what denote asks for when creating a new note. I use the title, keywords, and template prompts.
+
+#+begin_src emacs-lisp
+
+  (setq denote-prompts
+        '(title keywords template))
+
+#+end_src
+
+=denote-org-store-link-to-heading= is a useful setting that indicates that when =org-store-link= is called, that the link saved should be the one to the encompassing heading rather than the specific point in the file.
+
+#+begin_src emacs-lisp
+
+  (setq denote-org-store-link-to-heading t)
+
+#+end_src
+
+Denote's front matter by default doesn't contain "category", which is useful for adding to the agenda view as an indication of which file a particular TODO is found in. It also helps group the time logged on tasks in the clocktable by the file, which is useful if each project is represented by a file.
+
+#+begin_src emacs-lisp
+
+  (setq denote-org-front-matter
+    "#+title:      %1$s
+#+category:   %1$s
+#+date:       %2$s
+#+filetags:   %3$s
+#+identifier: %4$s
+\n")
+
+#+end_src
+
+=denote-menu=, along with =consult-notes=, provides a nicer interface to filtering and searching through notes.
+
+#+begin_src emacs-lisp
+
+  (use-package denote-menu
+    :custom
+    (denote-menu-title-column-width 50)
+    (denote-menu-show-file-type nil)
+    :bind (:map denote-menu-mode-map
+        ("/ r" . denote-menu-filter)
+        ("/ k" . denote-menu-filter-by-keyword)
+        ("/ o" . denote-menu-filter-out-keyword)
+        ("d" . denote-menu-export-to-dired)
+        ("c" . denote-menu-clear-filters)
+        ("g" . denote-menu-list-notes)))
+
+  (use-package consult-notes
+    :config
+    (consult-notes-denote-mode))
+
+#+end_src
+
+*** capture templates
+
+Capture templates allow quickly adding segments to org files from anywhere. We can use this to quickly note tasks without breaking flow.
+
+This wrapper function allows prompting for the actual filename to capture to. I need this so that I can select which Denote file to capture to.
+
+#+begin_src emacs-lisp
+
+  (defun rostre/capture-to-denote ()
+    (interactive)
+    (setq rostre/capture-target
+          (read-file-name "Capture to: " denote-directory nil t "inbox"))
+    (call-interactively #'org-capture))
+
+#+end_src
+
+Now we set up the actual capture templates. Here the capture-target set in the wrapper function above is used as the target file, and the headline depends on the type of capture.
+
+#+begin_src emacs-lisp
+
+  (setq org-capture-templates
+	  ;; todos are stored under the "Tasks" heading
+	'(("t" "Todo" entry (file+headline rostre/capture-target "Tasks")
+	   "\n* TODO [#%^{Priority: |A|B|C|D|E}] %? :oneoff:\n\n")
+	  ;; notes are plain text stored under the "Notes" heading
+	  ("n" "Note" item (file+headline rostre/capture-target "Notes")
+	   "\n- %u %?")
+	  ;; diary entries are headings with active timestamps
+	  ("d" "Diary" entry (file+headline rostre/capture-target "Diary")
+	   "\n* %?\n%^T")
+	  ;; reminder entries are TODO headings that should be resolved next time this note is visited
+	  ("r" "Reminders" entry (file+headline rostre/capture-target "Reminders")
+	   "\n* TODO %? :reminder:")))
+
+#+end_src
+
+** org-agenda
+
+*** basic settings
+
+For the agenda view, firstly we want to configure some basic settings. The first thing to set up is the key binding to open an agenda.
+
+#+begin_src emacs-lisp
+
+  (general-define-key "C-c a" 'org-agenda)
+
+#+end_src
+
+The file regexp decides what files to include from =org-agenda-files=.
+
+#+begin_src emacs-lisp
+
+  (setq org-agenda-file-regexp "\\`\\\([^.].*\\.org\\\|[0-9]\\\{8\\\}\\\(\\.gpg\\\)?\\\)\\'")
+
+#+end_src
+
+We want the agenda to open in the window that the cursor was in before the command was called:
+
+#+begin_src emacs-lisp
+
+  (setq org-agenda-window-setup 'current-window)
+
+#+end_src
+
+We want to avoid showing scheduled or deadline tasks in the agenda if they were marked as done:
+
+#+begin_src emacs-lisp
+
+  (setq org-agenda-skip-scheduled-if-done t)
+  (setq org-agenda-skip-deadline-if-done t)  
+
+#+end_src
+
+Diary entries should be included:
+
+#+begin_src emacs-lisp
+
+  (setq org-agenda-include-diary t)
+
+#+end_src
+
+Clicking in the agenda does not follow the link elsewhere:
+
+#+begin_src emacs-lisp
+
+  (setq org-agenda-mouse-1-follows-link nil)  
+
+#+end_src
+
+The clocktable is a useful resource for summarising all the time logged on tasks during a particular day. It can be accessed by hitting =R= while the point is in the agenda. We configure that:
+
+#+begin_src emacs-lisp
+  
+  (setq org-agenda-clockreport-parameter-plist '(:link t :maxlevel 2 :fileskip0 t :filetitle t)) 
+
+#+end_src
+
+*** org-agenda-files
+
+The =org-agenda-files= variable contains all the files that the agenda should consider when building it's views. Now I have all my todos in a small number of org files, so I just hard code those:
+
+#+begin_src emacs-lisp
+
+  (defun rostre/org-notes-files (dir)
+    (if (file-directory-p dir)
+        (directory-files dir t "\.org$")
+      '()))
+
+  (setq work-notes-directory "~/work_notes/")
+  (setq personal-notes-directory "~/synced_notes/")
+
+  (setq org-agenda-files (append
+                          (rostre/org-notes-files work-notes-directory)
+                          (rostre/org-notes-files personal-notes-directory)))
+
+#+end_src
+
+*** custom agenda views
+
+I have one main custom agenda view, labelled "Dashboard", and a couple of additional utility ones for special circumstances.
+
+The Dashboard view shows a typical agenda with the usual entries, and additional sections below that are organised by priority. Using those I can focus on the things that I need to do that day, whilst not losing track of lower priority items.
+
+The Reminders view shows a list of TODOs that are tagged as "Reminder". This is usually a list of things I don't want to forget to talk about in the next meeting on a particular topic.
+
+The Deadlines views shows all TODO items that have a deadline in the next month, which don't all show up if I just use the Dashboard view which only shows the deadlines up to 14 days away.
+
+#+begin_src emacs-lisp
+
+  (setq org-agenda-custom-commands 
+      '(("j" "Dashboard"
+         ((agenda "" (
+                      (org-deadline-warning-days 14)
+                      (org-agenda-span 'day)
+                      (org-agenda-start-with-log-mode '(state clock))
+                      (org-agenda-prefix-format "%-10t %-12s %-6e")))
+          (tags-todo "-create_jira_card+PRIORITY=\"A\"-SCHEDULED>\"<2000-01-01 Sat>\""
+                     ((org-agenda-overriding-header "Do Now")
+                      (org-agenda-sorting-strategy '(effort-up))
+                      (org-agenda-prefix-format "%-6e %-30c")
+                      (org-agenda-files
+                       (rostre/org-notes-files work-notes-directory))))
+          (tags-todo "-create_jira_card+PRIORITY=\"B\"-SCHEDULED>\"<2000-01-01 Sat>\""
+                     ((org-agenda-overriding-header "Do Later")
+                      (org-agenda-sorting-strategy '(effort-up))
+                      (org-agenda-prefix-format "%-6e %-30c")
+                      (org-agenda-files
+                       (rostre/org-notes-files work-notes-directory))))
+          (tags-todo "create_jira_card-SCHEDULED>\"<2000-01-01 Sat>\""
+                     ((org-agenda-overriding-header "Create Jira Cards")
+                      (org-agenda-prefix-format "%-6e %-30c")
+                      (org-agenda-files
+                       (rostre/org-notes-files work-notes-directory))))
+          (tags-todo "-SCHEDULED>\"<2000-01-01 Sat>\""
+                     ((org-agenda-overriding-header "Personal")
+                      (org-agenda-sorting-strategy '(effort-up))
+                      (org-agenda-prefix-format "%-6e %-30c")
+                      (org-agenda-files
+                       (rostre/org-notes-files personal-notes-directory))))))
+          ("r" "Reminders"
+           ((tags-todo "reminder"
+                       ((org-agenda-prefix-format "%-6e %-30c")))))
+          ("d" "Deadlines"
+           ((agenda "Deadlines"
+                    ((org-agenda-overriding-header "Deadlines")
+                     (org-agenda-span 'month)
+                     (org-agenda-time-grid nil)
+                     (org-agenda-entry-types '(:deadline))
+                     (org-agenda-show-all-dates nil)
+                     (org-deadline-warning-days 0)))))))
+
+#+end_src
+
+** org-babel
+
+org-babel is a tool for literate programming, which means code blocks interspersed with documentation, exactly like this configuration file.
+
+*** languages
+
+We can run HTTP requests from org-babel blocks using =ob-http=, so we preinstall that.
+
+#+begin_src emacs-lisp
+
+  (use-package ob-http
+    :ensure (:wait t))
+
+#+end_src
+
+Then set up all the languages we might want to use inside org-babel blocks. Make sure that ob-http has finished loading first before doing this.
+
+#+begin_src emacs-lisp
+
+  (org-babel-do-load-languages
+   'org-babel-load-languages
+   '((emacs-lisp . t)
+     (python . t)
+     (shell . t)
+     (http . t)
+     (sql . t)))
+
+#+end_src
+
+Finally set up org-babel so we don't have to confirm every single time that we want to run the code in an org-babel block.
+
+#+begin_src emacs-lisp
+
+  (setq org-confirm-babel-evaluate nil)
+
+#+end_src
+
+*** snippets
+
+The =org-tempo= package allows us to set up some code snippets for easily adding in org-babel code blocks in an org-mode buffer. To insert an elisp block for example, one would type =<el= then TAB and a new empty block would be inserted.
+
+#+begin_src emacs-lisp
+
+  (require 'org-tempo)
+  (add-to-list 'org-structure-template-alist '("sh" . "src shell"))
+  (add-to-list 'org-structure-template-alist '("el" . "src emacs-lisp"))
+  (add-to-list 'org-structure-template-alist '("py" . "src python"))
+  (add-to-list 'org-structure-template-alist '("http" . "src http :pretty"))
+  (add-to-list 'org-structure-template-alist '("sql" . "src sql"))
+  (add-to-list 'org-structure-template-alist '("lua" . "src lua"))
+
+#+end_src
+
+** export
+
+I use export to markdown a lot at work, so let's set that up.
+
+#+begin_src emacs-lisp
+
+  (require 'ox-md nil t)
+
+#+end_src
+
+* programming
+
+All the packages I set up to do programming work.
+
+** general visual aids
+
+Firstly there's a few useful packages and settings that apply to pretty much any programming language. All packages in this section use minor modes to activate their functionality, and we can enable them only in programming buffers by hooking them up to =prog-mode=. =use-package= provides a handy =:hook= argument for hooking up a particular mode's hook, which by standard is the name of the mode suffixed by =-hook=, with any function we want to call when that hook fires.
+
+I set tab width at 4 first for readability.
+
+#+begin_src emacs-lisp
+
+  (setq-default tab-width 4)
+
+#+end_src
+
+=highlight-indent-guides= provides bars to show how many levels of indentation down a particular block of code is. We only want to turn it on for =prog-mode= buffers, so hook into the minor mode after =prog-mode= is started.
+
+#+begin_src emacs-lisp
+
+  (use-package highlight-indent-guides
+    :config
+    (setq highlight-indent-guides-method 'column)
+    :hook
+    (prog-mode . highlight-indent-guides-mode))
+
+#+end_src
+
+=rainbow-delimiters= is purely for making it clearer which closing bracket belongs to which opening bracket. Especially useful in lisp :).
+
+#+begin_src emacs-lisp
+
+  (use-package rainbow-delimiters
+    :hook (prog-mode . rainbow-delimiters-mode))
+
+#+end_src
+
+** snippets
+
+=yasnippet= allows code snippets to be saved and expanded when a short 'key' string is entered into the buffer. It's particularly useful for initialising some org-babel blocks for common operations that I do while investigating issues.
+
+=yas-indent-line= being 'fixed' makes sure that expansions are correctly indented in the context they are inserted.
+
+=yasnippet-snippets= is a collection of default snippets to load in. You can see all the available snippets with =yas-describe-tables=.
+
+#+begin_src emacs-lisp
+
+  (use-package yasnippet
+    :config
+    (yas-global-mode 1)
+    (setq yas-indent-line 'fixed))
+
+  (use-package yasnippet-snippets
+    :after yasnippet)
+
+#+end_src
+
+** static code analysis
+
+=tree-sitter= is an improvement on the way that emacs classically achieved parsing code buffers for the purposes of syntax highlighting and navigation. It provides a real abstract syntax tree (AST) rather than using regex.
+
+However, it relies on having grammars installed that know how to parse various languages. Below we install a bunch of common grammars. We specify the version tags so that we're pinned to a particular version of the grammar, as the emacs packages are not guaranteed to keep up.
+
+#+begin_src emacs-lisp
+
+  (setq treesit-language-source-alist
+   '((bash "https://github.com/tree-sitter/tree-sitter-bash" "v0.20.5")
+     (c "https://github.com/tree-sitter/tree-sitter-c" "v0.20.7")
+     (cpp "https://github.com/tree-sitter/tree-sitter-cpp" "v0.23.0")
+     (cmake "https://github.com/uyha/tree-sitter-cmake" "v0.5.0")
+     (css "https://github.com/tree-sitter/tree-sitter-css" "v0.23.0")
+     (elisp "https://github.com/Wilfred/tree-sitter-elisp" "1.5.0")
+     (go "https://github.com/tree-sitter/tree-sitter-go" "v0.23.1")
+     (gomod "https://github.com/camdencheek/tree-sitter-go-mod" "v1.1.0")
+     (html "https://github.com/tree-sitter/tree-sitter-html" "v0.23.0")
+     (javascript "https://github.com/tree-sitter/tree-sitter-javascript" "v0.23.0" "src")
+     (json "https://github.com/tree-sitter/tree-sitter-json" "v0.23.0")
+     (make "https://github.com/alemuller/tree-sitter-make")
+     (markdown "https://github.com/ikatyang/tree-sitter-markdown" "v0.7.1")
+     (python "https://github.com/tree-sitter/tree-sitter-python" "v0.23.2")
+     (rust "https://github.com/tree-sitter/tree-sitter-rust" "v0.23.0")
+     (toml "https://github.com/tree-sitter/tree-sitter-toml" "v0.5.1")
+     (tsx "https://github.com/tree-sitter/tree-sitter-typescript" "v0.23.0" "tsx/src")
+     (typescript "https://github.com/tree-sitter/tree-sitter-typescript" "v0.23.0" "typescript/src")
+     (yaml "https://github.com/ikatyang/tree-sitter-yaml" "v0.5.0")))
+
+#+end_src
+
+Now map all the old major modes to the new ones that use tree-sitter rather than regexes.
+
+#+begin_src emacs-lisp
+
+  (setq major-mode-remap-alist
+   '((yaml-mode . yaml-ts-mode)
+     (bash-mode . bash-ts-mode)
+     (js2-mode . js-ts-mode)
+     (typescript-mode . typescript-ts-mode)
+     (json-mode . json-ts-mode)
+     (css-mode . css-ts-mode)
+     (python-mode . python-ts-mode)
+     (go-mode . go-ts-mode)
+     (rust-mode . rust-ts-mode)))
+
+#+end_src
+
+** language server protocol (lsp)
+
+LSP was originally developed for VSCode, and provides a standardised interface for communicating with a language server that can provide live feedback on code as it is being typed, supporting features like warnings/errors underlined in the code.
+
+Support is provided in emacs via either =eglot= or =lsp-mode=. =lsp-mode= is a little fancier and provides more bells and whistles in the UI, but =eglot= is simpler, better integrates with existing emacs functionality, and comes built in to emacs, so that's the one I use.
+
+The configuration settings make sure that =eglot= is invoked in =python= and =go= buffers. It also shows documentation in a dedicated documentation buffer if one exists.
+
+I've bound most of the features I regularly use to the prefix =C-c l=.
+
+#+begin_src emacs-lisp
+
+  (use-package eldoc) ;; dependency
+
+  (use-package eglot
+    :after eldoc
+    :config
+    (add-hook 'python-ts-mode-hook 'eglot-ensure)
+    (add-hook 'go-ts-mode-hook 'eglot-ensure)
+    (add-hook 'rust-ts-mode-hook 'eglot-ensure)
+    (setq eglot-ignored-server-capabilities '())
+    (setq eldoc-echo-area-prefer-doc-buffer t)
+    :bind
+    (:map eglot-mode-map
+          ("C-c l f" . eglot-format-buffer)
+          ("C-c l e" . flymake-show-project-diagnostics)
+          ("C-c l n" . flymake-goto-next-error)
+          ("C-c l p" . flymake-goto-prev-error)
+          ("C-c l a" . eglot-code-actions)
+          ("C-c l r" . eglot-rename)
+          ("C-c l d" . xref-find-definitions)
+          ("C-c l x" . xref-find-references)
+          ("C-c l m" . compile)))
+
+#+end_src
+
+** debugger
+
+There is a more established package called =dap-mode= for providing a debugging experience in emacs, but it depends on =lsp-mode=. An alternative is =dape-mode= that interacts with =eglot= instead. I need to experiment with this more.
+
+#+begin_src emacs-lisp
+
+  (use-package jsonrpc) ;; dependency
+
+  (use-package dape
+    :after jsonrpc)
+
+#+end_src
+
+** rust
+
+Here I set up all the support and IDE features for the rust language. This [[https://robert.kra.hn/posts/rust-emacs-setup/#prerequisites][guide]] sets everything up using =lsp-mode=, but I want to use =eglot= instead. It's actually very fully featured out of the box. It even supports inline type hints!
+
+The one thing to do is tell emacs to use =rust-ts-mode= for =.rs= files, as it doesn't know by default.
+
+#+begin_src emacs-lisp
+
+  (add-to-list 'auto-mode-alist '("\\.rs\\'" . rust-ts-mode))
+
+#+end_src
+
+* terminal
+
+Sometimes you can't do absolutely /everything/ in emacs.
+
+I have experimented with =eshell= in the past, but in the end I settled on using =vterm=, which is a full terminal emulator within emacs, rather than a shell implementation like the former. This means it doesn't integrate as well with other emacs features, but it does perform better particularly when large amounts of outputs are printed. It also works a little more reliably when CLI tools do some of the fancier stuff.
+
+The =multi-vterm= package supports having multiple vterm terminals at once running in the same emacs.
+
+#+begin_src emacs-lisp
+
+  (use-package vterm
+    :commands vterm
+    :config
+    (setq term-prompt-regexp "^[^#$%>\n]*[#$%>] *")
+    (setq vterm-max-scrollback 10000)
+    ;; key bindings
+    (general-define-key "C-c v" 'multi-vterm))
+
+  (use-package multi-vterm)
+
+#+end_src
+
+* file system navigation
+
+For navigating around the file system, we could use =dired=. However, let's try =dirvish= which tries to provide a more batteries-included experience.
+
+I'll come back to this to try customising it some more.
+
+#+begin_src emacs-lisp
+
+  (use-package dirvish
+    :config
+    (dirvish-override-dired-mode))
+
+#+end_src
+
+* macros
+
+This section is for keyboard macros that I've recorded and deemed useful enough to bind to a key for use evermore.
+
+To add new macros to this section:
+- Start a new macro with =C-x (=.
+- Type some commands
+- End the new macro with =C-x )=.
+- Run =M-x name-last-kbd-macro= to give the macro a name.
+- Navigate to this buffer and open a new elisp org-babel block (Type <el and hit TAB).
+- Run =M-x insert-kbd-macro= to paste the code for the macro to the org-babel block.
+- Bind the new function to a key using =general-define-key=. I tend to use the prefix =C-c k=.
+
+Record a quick dated note to the team logbook.
+
+#+begin_src emacs-lisp
+
+  (defalias 'rostre/macro/record-feedback
+    (kmacro "C-c d c C-k t e a m - l o g b o o k <return> n"))
+  (general-define-key "C-c k n" 'rostre/macro/record-feedback)
+
+	#+end_src
+
+Record a todo to the inbox at priority A
+
+#+begin_src emacs-lisp
+
+  (defalias 'rostre/macro/new-todo
+    (kmacro "C-c d c <return> t <return>"))
+  (general-define-key "C-c k t" 'rostre/macro/new-todo)
+
+#+end_src
+
+Indent a selected block by four spaces
+
+#+begin_src emacs-lisp
+
+  (defalias 'rostre/macro/indent-block
+    (kmacro "C-x r t SPC SPC SPC SPC <return>"))
+  (general-define-key "C-c k i" 'rostre/macro/indent-block)
+
+#+end_src
+
+* work
+
+The configuration here is stuff specifically for work, which doesn't apply to my home emacs use. Switch the following flag on to enable all of this stuff.
+
+#+begin_src emacs-lisp
+
+  (setq in-office nil)
+
+#+end_src
+
+** copilot
+
+I have a github copilot license to use at work. It integrates pretty well with emacs, although does get in the way of =corfu=. It's still very useful.
+
+Obviously there's some additional setup required here, check out [[https://github.com/copilot-emacs/copilot.el][the repo]] for more details.
+
+TODO - redo this with elpaca
+
+#+begin_src emacs-lisp
+
+;;  (use-package copilot
+;;    :if in-office
+;;    :vc (:fetcher github :repo copilot-emacs/copilot.el)
+;;    :hook (prog-mode . copilot-mode)
+;;    :bind (:map copilot-completion-map
+;;                ("<tab>" . 'copilot-accept-completion)
+;;                ("TAB" . 'copilot-accept-completion)
+;;                ("C-TAB" . 'copilot-accept-completion-by-word)
+;;                ("C-<tab>" . 'copilot-accept-completion-by-word)))
+
+#+end_src
+
+** org-mode
+
+There's a bunch of specific org-mode functionality I've built specifically for work as a manager. I don't think I'm likely to use this outside of work.
+
+This filter gets all entries related to a specific person, plus everything tagged with "downflow", for the last week.
+
+#+begin_src emacs-lisp
+
+  (defun rostre/filter-for-one-to-one-meeting ()
+    (interactive)
+    (let ((person-tag
+           (completing-read "1-1 for person: " (org-get-buffer-tags)))
+          (week-ago
+           (format-time-string "%Y-%m-%d"
+                               (days-to-time
+                                (-
+                                 (- (time-to-days (current-time)) 7)
+                                 (time-to-days 0))))))
+      (org-match-sparse-tree
+       nil
+       (concat "+" person-tag "+CREATED>=\"<" week-ago ">\"|+downflow+CREATED>=\"<" week-ago ">\""))))
+
+  (general-define-key "C-c f o" 'rostre/filter-for-one-to-one-meeting)
+
+#+end_src
+
+* play
+
+Emacs is not all about productivity, it's fantastic for procrastination too. Who am I kidding, it's all about procrastination, just these packages are a little more explicit about that.
+
+=elfeed= gives us RSS feeds in emacs so that we can read blog posts here.
+
+#+begin_src emacs-lisp
+
+  (use-package elfeed
+  :config
+  (setq elfeed-feeds '(
+        ("https://news.ycombinator.com/rss" code)
+        ("https://rostre.bearblog.dev/feed/?type=rss" code)
+        ("https://planet.emacslife.com/atom.xml" emacs code))))
+
+#+end_src
+
+We can also access Mastodon from emacs.
+
+#+begin_src emacs-lisp
+
+  (use-package mastodon
+    :custom
+    (mastodon-instance-url "https://hachyderm.io")
+    (mastodon-active-user "robsws"))
+
+#+end_src
+
+=erc= provides IRC connection. The config here connects to a couple of IRC channels automatically at startup.
+
+#+begin_src emacs-lisp
+
+  (setq erc-server "irc.libera.chat"
+      erc-nick "rostre"
+      erc-track-shorten-start 8
+      erc-autojoin-channels-alist '(("irc.libera.chat" "#systemcrafters" "#emacs"))
+      erc-kill-buffer-on-part t
+      erc-auto-query 'bury)
+
+#+end_src
+
+Sometimes it's fun to do a typing speed test to remind myself how little my WPM has progressed over the years since I learned to touch type.
+
+#+begin_src emacs-lisp
+
+  (use-package speed-type)
+
+#+end_src
