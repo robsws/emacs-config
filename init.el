@@ -291,6 +291,9 @@
   :custom
   (magit-display-buffer-function #'magit-display-buffer-same-window-except-diff-v1))
 
+(setq work-notes-directory "~/work_notes/")
+(setq personal-notes-directory "~/synced_notes/")
+
 (defun rostre/org-buffer-setup ()
   (variable-pitch-mode 1)
   (visual-line-mode 1)
@@ -327,6 +330,20 @@
     (org-set-property "CREATED" (format-time-string "[%Y-%m-%d %T]"))))
 
 (add-hook 'org-insert-heading-hook #'rostre/set-creation-date-property-on-new-heading)
+
+(setq org-capture-templates
+  '(("t" "Work Task" entry (file+headline "~/work_notes/journal.org" "work journal")
+     "\n* TODO [#%^{Priority: |A|B|C|D|E}] %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
+    ("n" "Work Note" entry (file+headline "~/work_notes/journal.org" "work journal")
+     "\n* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
+    ("d" "Work Diary" entry (file+headline "~/work_notes/diary.org" "work diary")
+     "\n* %?\n%^T" :empty-lines-before 1)
+    ("T" "Personal Task" entry (file+headline "~/synced_notes/journal.org" "personal journal")
+     "\n* TODO [#%^{Priority: |A|B|C|D|E}] %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
+    ("N" "Personal Note" entry (file+headline "~/synced_notes/journal.org" "personal journal")
+     "\n* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)))
+
+(general-define-key "C-c f c" 'org-capture)
 
 (use-package denote
   :ensure (:wait t) ;; wait so that denote functions can be referenced later
@@ -380,26 +397,6 @@
   :config
   (consult-notes-denote-mode))
 
-(defun rostre/capture-to-denote ()
-  (interactive)
-  (setq rostre/capture-target
-        (read-file-name "Capture to: " denote-directory nil t "inbox"))
-  (call-interactively #'org-capture))
-
-(setq org-capture-templates
-	;; todos are stored under the "Tasks" heading
-  '(("t" "Todo" entry (file+headline rostre/capture-target "Tasks")
-	 "\n* TODO [#%^{Priority: |A|B|C|D|E}] %? :oneoff:\n\n")
-	;; notes are plain text stored under the "Notes" heading
-	("n" "Note" item (file+headline rostre/capture-target "Notes")
-	 "\n- %u %?")
-	;; diary entries are headings with active timestamps
-	("d" "Diary" entry (file+headline rostre/capture-target "Diary")
-	 "\n* %?\n%^T")
-	;; reminder entries are TODO headings that should be resolved next time this note is visited
-	("r" "Reminders" entry (file+headline rostre/capture-target "Reminders")
-	 "\n* TODO %? :reminder:")))
-
 (general-define-key "C-c a" 'org-agenda)
 
 (setq org-agenda-file-regexp "\\`\\\([^.].*\\.org\\\|[0-9]\\\{8\\\}\\\(\\.gpg\\\)?\\\)\\'")
@@ -419,9 +416,6 @@
   (if (file-directory-p dir)
       (directory-files dir t "\.org$")
     '()))
-
-(setq work-notes-directory "~/work_notes/")
-(setq personal-notes-directory "~/synced_notes/")
 
 (setq org-agenda-files (append
                         (rostre/org-notes-files work-notes-directory)

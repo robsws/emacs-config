@@ -681,9 +681,16 @@ Now install magit, with an extra configuration line to display the magit status 
 
 ** org-mode
 
-There's some basic set-up to do with org-mode before we starting augmenting it with packages such as Denote.
+There's some basic set-up to do with org-mode before we starting augmenting it with packages such as Denote. First set a couple of variables to indicate where my notes are.
 
-Firstly, I want org mode to use variable-pitch (i.e. non-monospace) fonts and =visual-line-mode=, which wraps the text onto a new line rather than making it extend out of the visible window. I also enable =org-indent-mode= that indents the blocks of text based on their parent header nesting level. To do all this, I specify a function that will be called as a hook when org-mode is invoked. This means that these commands will only be invoked when opening org-mode files.
+#+begin_src emacs-lisp
+
+  (setq work-notes-directory "~/work_notes/")
+  (setq personal-notes-directory "~/synced_notes/")
+  
+#+end_src
+
+I want org mode to use variable-pitch (i.e. non-monospace) fonts and =visual-line-mode=, which wraps the text onto a new line rather than making it extend out of the visible window. I also enable =org-indent-mode= that indents the blocks of text based on their parent header nesting level. To do all this, I specify a function that will be called as a hook when org-mode is invoked. This means that these commands will only be invoked when opening org-mode files.
 
 #+begin_src emacs-lisp
 
@@ -792,6 +799,28 @@ The following code adds the =CREATED= property to every new heading automaticall
 
 #+end_src
 
+*** capture templates
+
+Capture templates allow quickly adding segments to org files from anywhere. We can use this to quickly add notes or tasks without breaking flow.
+
+#+begin_src emacs-lisp
+
+  (setq org-capture-templates
+    '(("t" "Work Task" entry (file+headline "~/work_notes/journal.org" "work journal")
+       "\n* TODO [#%^{Priority: |A|B|C|D|E}] %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
+      ("n" "Work Note" entry (file+headline "~/work_notes/journal.org" "work journal")
+       "\n* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
+      ("d" "Work Diary" entry (file+headline "~/work_notes/diary.org" "work diary")
+       "\n* %?\n%^T" :empty-lines-before 1)
+      ("T" "Personal Task" entry (file+headline "~/synced_notes/journal.org" "personal journal")
+       "\n* TODO [#%^{Priority: |A|B|C|D|E}] %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
+      ("N" "Personal Note" entry (file+headline "~/synced_notes/journal.org" "personal journal")
+       "\n* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)))
+
+  (general-define-key "C-c f c" 'org-capture)
+
+#+end_src
+
 ** denote
 
 =denote= is a package that allows the quick creation of new note files that are stored with predictable filenames and metadata such that they can be easily searched. This is good for storing a knowledge base.
@@ -884,42 +913,6 @@ Denote's front matter by default doesn't contain "category", which is useful for
 
 #+end_src
 
-*** capture templates
-
-Capture templates allow quickly adding segments to org files from anywhere. We can use this to quickly note tasks without breaking flow.
-
-This wrapper function allows prompting for the actual filename to capture to. I need this so that I can select which Denote file to capture to.
-
-#+begin_src emacs-lisp
-
-  (defun rostre/capture-to-denote ()
-    (interactive)
-    (setq rostre/capture-target
-          (read-file-name "Capture to: " denote-directory nil t "inbox"))
-    (call-interactively #'org-capture))
-
-#+end_src
-
-Now we set up the actual capture templates. Here the capture-target set in the wrapper function above is used as the target file, and the headline depends on the type of capture.
-
-#+begin_src emacs-lisp
-
-  (setq org-capture-templates
-	  ;; todos are stored under the "Tasks" heading
-	'(("t" "Todo" entry (file+headline rostre/capture-target "Tasks")
-	   "\n* TODO [#%^{Priority: |A|B|C|D|E}] %? :oneoff:\n\n")
-	  ;; notes are plain text stored under the "Notes" heading
-	  ("n" "Note" item (file+headline rostre/capture-target "Notes")
-	   "\n- %u %?")
-	  ;; diary entries are headings with active timestamps
-	  ("d" "Diary" entry (file+headline rostre/capture-target "Diary")
-	   "\n* %?\n%^T")
-	  ;; reminder entries are TODO headings that should be resolved next time this note is visited
-	  ("r" "Reminders" entry (file+headline rostre/capture-target "Reminders")
-	   "\n* TODO %? :reminder:")))
-
-#+end_src
-
 ** org-agenda
 
 *** basic settings
@@ -991,9 +984,6 @@ The =org-agenda-files= variable contains all the files that the agenda should co
     (if (file-directory-p dir)
         (directory-files dir t "\.org$")
       '()))
-
-  (setq work-notes-directory "~/work_notes/")
-  (setq personal-notes-directory "~/synced_notes/")
 
   (setq org-agenda-files (append
                           (rostre/org-notes-files work-notes-directory)
