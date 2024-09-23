@@ -92,14 +92,14 @@
                     :height rostre/font-size)
 
 (defun rostre/org-faces ()
-      (set-face-attribute 'org-document-title nil :height 1.4)
-      (set-face-attribute 'org-todo nil :height 1.0)
-      (set-face-attribute 'org-level-1 nil :height 1.3)
-      (set-face-attribute 'org-level-2 nil :height 1.2)
-      (set-face-attribute 'org-level-3 nil :height 1.2)
-      (set-face-attribute 'org-level-4 nil :height 1.2)
-      (set-face-attribute 'org-level-5 nil :height 1.2)
-      (set-face-attribute 'org-level-6 nil :height 1.2))
+  (set-face-attribute 'org-document-title nil :height 1.4)
+  (set-face-attribute 'org-todo nil :height 1.0)
+  (set-face-attribute 'org-level-1 nil :height 1.3)
+  (set-face-attribute 'org-level-2 nil :height 1.2)
+  (set-face-attribute 'org-level-3 nil :height 1.2)
+  (set-face-attribute 'org-level-4 nil :height 1.2)
+  (set-face-attribute 'org-level-5 nil :height 1.2)
+  (set-face-attribute 'org-level-6 nil :height 1.2))
 
 (add-hook 'org-mode-hook 'rostre/org-faces)
 
@@ -270,7 +270,7 @@
 (savehist-mode 1)
 
 (when (not (file-directory-p "~/.emacs-backup-files"))
-      (make-directory "~/.emacs-backup-files/"))
+  (make-directory "~/.emacs-backup-files/"))
 (setq temporary-file-directory "~/.emacs-backup-files/")
 (setq backup-directory-alist
   `((".*" . ,temporary-file-directory)))
@@ -278,8 +278,8 @@
   `((".*" ,temporary-file-directory t)))
 
 (general-define-key :prefix "C-c"
-                    "c" (lambda () (interactive) (find-file "~/emacs-conf/config.org"))
-                    "r" (lambda () (interactive) (load-file "~/emacs-conf/init.el"))
+                    "c" (lambda () (interactive) (find-file "~/emacs-config/config.org"))
+                    "r" (lambda () (interactive) (load-file "~/emacs-config/init.el"))
                     "w" 'window-swap-states)
 
 (use-package seq)
@@ -388,7 +388,7 @@
 
 (setq org-capture-templates
 	;; todos are stored under the "Tasks" heading
-      '(("t" "Todo" entry (file+headline rostre/capture-target "Tasks")
+  '(("t" "Todo" entry (file+headline rostre/capture-target "Tasks")
 	 "\n* TODO [#%^{Priority: |A|B|C|D|E}] %? :oneoff:\n\n")
 	;; notes are plain text stored under the "Notes" heading
 	("n" "Note" item (file+headline rostre/capture-target "Notes")
@@ -494,11 +494,14 @@
 
 (setq-default tab-width 4)
 
-(use-package highlight-indent-guides
+(use-package indent-bars
   :config
-  (setq highlight-indent-guides-method 'column)
+  (require 'indent-bars-ts)
+  (setq indent-bars-treesit-support t)
   :hook
-  (prog-mode . highlight-indent-guides-mode))
+  (prog-mode . indent-bars-mode))
+
+(setq indent-bars-treesit-scope '((rust block)))
 
 (use-package rainbow-delimiters
   :hook (prog-mode . rainbow-delimiters-mode))

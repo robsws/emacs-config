@@ -44,7 +44,7 @@ Here's some things that might need to be done after the config has finished load
 
 * troubleshooting
 
-Sometimes elpaca reports an error for some packages on first load: "Cannot determine url from recipe". The solution to this problem is just to delete the elpaca cache files in =~/emacs-conf/elpaca/cache= and restart emacs.
+Sometimes elpaca reports an error for some packages on first load: "Cannot determine url from recipe". The solution to this problem is just to delete the elpaca cache files in =~/emacs-config/elpaca/cache= and restart emacs.
 
 * bootstraps
 
@@ -646,8 +646,8 @@ There's a few navigation/editing functions I have bound in the =C-c= space for e
 #+begin_src emacs-lisp
 
   (general-define-key :prefix "C-c"
-                      "c" (lambda () (interactive) (find-file "~/emacs-conf/config.org"))
-                      "r" (lambda () (interactive) (load-file "~/emacs-conf/init.el"))
+                      "c" (lambda () (interactive) (find-file "~/emacs-config/config.org"))
+                      "r" (lambda () (interactive) (load-file "~/emacs-config/init.el"))
                       "w" 'window-swap-states)
 
 #+end_src
@@ -1136,15 +1136,26 @@ I set tab width at 4 first for readability.
 
 #+end_src
 
-=highlight-indent-guides= provides bars to show how many levels of indentation down a particular block of code is. We only want to turn it on for =prog-mode= buffers, so hook into the minor mode after =prog-mode= is started.
+=indent-bars= is a newer version of =highlight-indent-guides= that provides bars to show how many levels of indentation down a particular block of code is. The extra features are that it is fully customizable in terms of look, plus it highlights the indent level where point is.
+
+We only want to turn it on for =prog-mode= buffers, so hook into the minor mode after =prog-mode= is started.
 
 #+begin_src emacs-lisp
 
-  (use-package highlight-indent-guides
+  (use-package indent-bars
     :config
-    (setq highlight-indent-guides-method 'column)
+    (require 'indent-bars-ts)
+    (setq indent-bars-treesit-support t)
     :hook
-    (prog-mode . highlight-indent-guides-mode))
+    (prog-mode . indent-bars-mode))
+
+#+end_src
+
+We can further customize =indent-bars= to activate only in the point's scope. By default it'll highlight a line in all indent levels aligned with the one that point is in. We have to do this by language though.
+
+#+begin_src emacs-lisp
+
+  (setq indent-bars-treesit-scope '((rust block)))
 
 #+end_src
 
