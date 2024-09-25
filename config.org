@@ -659,7 +659,7 @@ By default, emacs leaves a ton of temporary files all over the place, which can 
 
   ;; redirect lock files
   (setq lock-file-name-transforms
-        '(("\\`/.*/\\([^/]+\\)\\'" temporary-file-directory t)))
+        `((".*" ,temporary-file-directory t)))
 
 #+end_src
 
