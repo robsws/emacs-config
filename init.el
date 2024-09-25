@@ -92,14 +92,14 @@
                     :height rostre/font-size)
 
 (defun rostre/org-faces ()
-  (set-face-attribute 'org-document-title nil :height 1.4)
-  (set-face-attribute 'org-todo nil :height 1.0)
-  (set-face-attribute 'org-level-1 nil :height 1.3)
-  (set-face-attribute 'org-level-2 nil :height 1.2)
-  (set-face-attribute 'org-level-3 nil :height 1.2)
-  (set-face-attribute 'org-level-4 nil :height 1.2)
-  (set-face-attribute 'org-level-5 nil :height 1.2)
-  (set-face-attribute 'org-level-6 nil :height 1.2))
+      (set-face-attribute 'org-document-title nil :height 1.4)
+      (set-face-attribute 'org-todo nil :height 1.0)
+      (set-face-attribute 'org-level-1 nil :height 1.3)
+      (set-face-attribute 'org-level-2 nil :height 1.2)
+      (set-face-attribute 'org-level-3 nil :height 1.2)
+      (set-face-attribute 'org-level-4 nil :height 1.2)
+      (set-face-attribute 'org-level-5 nil :height 1.2)
+      (set-face-attribute 'org-level-6 nil :height 1.2))
 
 (add-hook 'org-mode-hook 'rostre/org-faces)
 
@@ -443,35 +443,35 @@
                         (rostre/org-notes-files personal-notes-directory)))
 
 (setq org-agenda-custom-commands 
-    '(("j" "Dashboard"
-       ((agenda "" (
-                    (org-deadline-warning-days 14)
-                    (org-agenda-span 'day)
-                    (org-agenda-start-with-log-mode '(state clock))
-                    (org-agenda-prefix-format "%-10t %-12s %-6e")))
-        (tags-todo "-create_jira_card+PRIORITY=\"A\"-SCHEDULED>\"<2000-01-01 Sat>\""
-                   ((org-agenda-overriding-header "Do Now")
-                    (org-agenda-sorting-strategy '(effort-up))
-                    (org-agenda-prefix-format "%-6e %-30c")
-                    (org-agenda-files
-                     (rostre/org-notes-files work-notes-directory))))
-        (tags-todo "-create_jira_card+PRIORITY=\"B\"-SCHEDULED>\"<2000-01-01 Sat>\""
-                   ((org-agenda-overriding-header "Do Later")
-                    (org-agenda-sorting-strategy '(effort-up))
-                    (org-agenda-prefix-format "%-6e %-30c")
-                    (org-agenda-files
-                     (rostre/org-notes-files work-notes-directory))))
-        (tags-todo "create_jira_card-SCHEDULED>\"<2000-01-01 Sat>\""
-                   ((org-agenda-overriding-header "Create Jira Cards")
-                    (org-agenda-prefix-format "%-6e %-30c")
-                    (org-agenda-files
-                     (rostre/org-notes-files work-notes-directory))))
-        (tags-todo "-SCHEDULED>\"<2000-01-01 Sat>\""
-                   ((org-agenda-overriding-header "Personal")
-                    (org-agenda-sorting-strategy '(effort-up))
-                    (org-agenda-prefix-format "%-6e %-30c")
-                    (org-agenda-files
-                     (list (file-name-concat personal-notes-directory "journal.org")))))))
+      '(("j" "Dashboard"
+         ((agenda "" (
+                      (org-deadline-warning-days 14)
+                      (org-agenda-span 'day)
+                      (org-agenda-start-with-log-mode '(state clock))
+                      (org-agenda-prefix-format "%-10t %-12s %-6e")))
+          (tags-todo "-create_jira_card+PRIORITY=\"A\"-SCHEDULED>\"<2000-01-01 Sat>\""
+                     ((org-agenda-overriding-header "Do Now")
+                      (org-agenda-sorting-strategy '(effort-up))
+                      (org-agenda-prefix-format "%-6e %-30c")
+                      (org-agenda-files
+                       (rostre/org-notes-files work-notes-directory))))
+          (tags-todo "-create_jira_card+PRIORITY=\"B\"-SCHEDULED>\"<2000-01-01 Sat>\""
+                     ((org-agenda-overriding-header "Do Later")
+                      (org-agenda-sorting-strategy '(effort-up))
+                      (org-agenda-prefix-format "%-6e %-30c")
+                      (org-agenda-files
+                       (rostre/org-notes-files work-notes-directory))))
+          (tags-todo "create_jira_card-SCHEDULED>\"<2000-01-01 Sat>\""
+                     ((org-agenda-overriding-header "Create Jira Cards")
+                      (org-agenda-prefix-format "%-6e %-30c")
+                      (org-agenda-files
+                       (rostre/org-notes-files work-notes-directory))))
+          (tags-todo "-SCHEDULED>\"<2000-01-01 Sat>\""
+                     ((org-agenda-overriding-header "Personal")
+                      (org-agenda-sorting-strategy '(effort-up))
+                      (org-agenda-prefix-format "%-6e %-30c")
+                      (org-agenda-files
+                       (list (file-name-concat personal-notes-directory "journal.org")))))))
         ("r" "Reminders"
          ((tags-todo "reminder"
                      ((org-agenda-prefix-format "%-6e %-30c")))))
@@ -482,7 +482,28 @@
                    (org-agenda-time-grid nil)
                    (org-agenda-entry-types '(:deadline))
                    (org-agenda-show-all-dates nil)
-                   (org-deadline-warning-days 0)))))))
+                   (org-deadline-warning-days 0)))))
+        ("f" "Fun"
+         ((todo "TODO"
+                ((org-agenda-overriding-header "Movies")
+                 (org-agenda-files
+                  (list (file-name-concat personal-notes-directory "movies.org")))))
+          (todo "TODO"
+                ((org-agenda-overriding-header "Games")
+                 (org-agenda-files
+                  (list (file-name-concat personal-notes-directory "games.org")))))
+          (todo "TODO"
+                ((org-agenda-overriding-header "Books")
+                 (org-agenda-files
+                  (list (file-name-concat personal-notes-directory "books.org")))))
+          (todo "TODO"
+                ((org-agenda-overriding-header "Blog Ideas")
+                 (org-agenda-files
+                  (list (file-name-concat personal-notes-directory "blogs.org")))))
+          (todo "TODO"
+                ((org-agenda-overriding-header "Project Ideas")
+                 (org-agenda-files
+                  (list (file-name-concat personal-notes-directory "miniprojects.org")))))))))
 
 (use-package ob-http
   :ensure (:wait t))
