@@ -126,10 +126,22 @@
 (use-package timu-rouge-theme
   :config (load-theme 'timu-rouge t))
 
+(define-minor-mode global-transparent-background-mode
+  "Toggles background transparency for emacs frames"
+  :init-value nil
+  :global t
+  (if global-transparent-background-mode
+      (progn
+        (set-frame-parameter (selected-frame) 'alpha '(95 . 95))
+        (add-to-list 'default-frame-alist '(alpha . (95 95))))
+    (progn
+      (set-frame-parameter (selected-frame) 'alpha '(100 . 100))
+      (assq-delete-all 'alpha default-frame-alist))))
+
+(general-define-key "C-c x" 'global-transparent-background-mode)
+
 (when (eq system-type 'gnu/linux)
-  (progn
-    (set-frame-parameter (selected-frame) 'alpha '(95 . 95))
-    (add-to-list 'default-frame-alist '(alpha . (95 95)))))
+  (global-transparent-background-mode))
 
 (use-package all-the-icons
   :init
@@ -332,11 +344,11 @@
 (add-hook 'org-insert-heading-hook #'rostre/set-creation-date-property-on-new-heading)
 
 (setq org-capture-templates
-  '(("t" "Work Task" entry (file+headline "~/work_notes/journal.org" "work journal")
+  '(("t" "Work Task" entry (file+headline "~/work_notes/work_journal.org" "work journal")
      "\n* TODO [#%^{Priority: |A|B|C|D|E}] %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
-    ("n" "Work Note" entry (file+headline "~/work_notes/journal.org" "work journal")
-     "\n* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
-    ("d" "Work Diary" entry (file+headline "~/work_notes/diary.org" "work diary")
+    ("n" "Work Note" entry (file+headline "~/work_notes/work_journal.org" "work journal")
+     "\n* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1 :clock-in t)
+    ("d" "Work Diary" entry (file+headline "~/work_notes/work_diary.org" "work diary")
      "\n* %?\n%^T" :empty-lines-before 1)
     ("T" "Personal Task" entry (file+headline "~/synced_notes/journal.org" "personal journal")
      "\n* TODO [#%^{Priority: |A|B|C|D|E}] %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
@@ -474,6 +486,8 @@
    (http . t)
    (sql . t)))
 
+(setq org-babel-python-command "/usr/local/bin/python3.9")
+
 (setq org-confirm-babel-evaluate nil)
 
 (require 'org-tempo)
@@ -594,6 +608,10 @@
 (defalias 'rostre/macro/indent-block
   (kmacro "C-x r t SPC SPC SPC SPC <return>"))
 (general-define-key "C-c k i" 'rostre/macro/indent-block)
+
+(defalias 'rostre/macro/paste-image
+ (kmacro "C-c y C-p C-p C-e <return> i m g w i d t h <tab> C-c C-x C-v C-c C-x C-v"))
+(general-define-key "C-c k y" 'rostre/macro/paste-image)
 
 (setq in-office nil)
 
