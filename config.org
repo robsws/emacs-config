@@ -644,13 +644,22 @@ By default, emacs leaves a ton of temporary files all over the place, which can 
 
 #+begin_src emacs-lisp
 
-  (when (not (file-directory-p "~/.emacs-backup-files"))
-	(make-directory "~/.emacs-backup-files/"))
-  (setq temporary-file-directory "~/.emacs-backup-files/")
+  ;; create the directory if it doesn't exist
+  (when (not (file-directory-p "~/.emacs-temp-files"))
+    (make-directory "~/.emacs-temp-files/"))
+  (setq temporary-file-directory "~/.emacs-temp-files/")
+
+  ;; redirect backup files
   (setq backup-directory-alist
-    `((".*" . ,temporary-file-directory)))
+        `((".*" . ,temporary-file-directory)))
+
+  ;; redirect autosave files
   (setq auto-save-file-name-transforms
-    `((".*" ,temporary-file-directory t)))
+        `((".*" ,temporary-file-directory t)))
+
+  ;; redirect lock files
+  (setq lock-file-name-transforms
+        '(("\\`/.*/\\([^/]+\\)\\'" temporary-file-directory t)))
 
 #+end_src
 
@@ -947,7 +956,7 @@ The file regexp decides what files to include from =org-agenda-files=.
 
 #+begin_src emacs-lisp
 
-  (setq org-agenda-file-regexp "\\`\\\([^.].*\\.org\\\|[0-9]\\\{8\\\}\\\(\\.gpg\\\)?\\\)\\'")
+  (setq org-agenda-file-regexp "\\`[^.].*\\.org\\'")
 
 #+end_src
 
@@ -1050,7 +1059,7 @@ The Deadlines views shows all TODO items that have a deadline in the next month,
                       (org-agenda-sorting-strategy '(effort-up))
                       (org-agenda-prefix-format "%-6e %-30c")
                       (org-agenda-files
-                       (rostre/org-notes-files personal-notes-directory))))))
+                       (list (file-name-concat personal-notes-directory "journal.org")))))))
           ("r" "Reminders"
            ((tags-todo "reminder"
                        ((org-agenda-prefix-format "%-6e %-30c")))))
@@ -1307,6 +1316,34 @@ The one thing to do is tell emacs to use =rust-ts-mode= for =.rs= files, as it d
 
 #+end_src
 
+* file system navigation
+
+Sticking with good old =dired=, although we configure it with some quality of life features. The keymap settings mean that we can create new files and go up directories with single key presses. By using ls-based dired, we can sort all of the directories to the top and hide any backup files.
+
+#+begin_src emacs-lisp
+
+  (use-package dired
+    :ensure nil
+    :commands (dired dired-jump)
+    :bind (("C-x C-j" . dired-jump))
+    (:map dired-mode-map
+          ;; b goes up to parent dir
+          ("b" . 'dired-up-directory)
+          ;; N creates new file
+          ("N" . 'find-file))
+    :config
+    (require 'dired-x)
+    :custom
+    ;; Use gls for driving dired on mac
+    ((when system-type 'darwin
+           (insert-directory-program "gls"))
+     (dired-use-ls-dired t)
+     ;; Put all the directories at the top, hide backup files
+     (dired-listing-switches "-aghoB --group-directories-first")
+     (delete-by-moving-to-trash t)))
+
+#+end_src
+
 * terminal
 
 Sometimes you can't do absolutely /everything/ in emacs.
@@ -1326,20 +1363,6 @@ The =multi-vterm= package supports having multiple vterm terminals at once runni
     (general-define-key "C-c v" 'multi-vterm))
 
   (use-package multi-vterm)
-
-#+end_src
-
-* file system navigation
-
-For navigating around the file system, we could use =dired=. However, let's try =dirvish= which tries to provide a more batteries-included experience.
-
-I'll come back to this to try customising it some more.
-
-#+begin_src emacs-lisp
-
-  (use-package dirvish
-    :config
-    (dirvish-override-dired-mode))
 
 #+end_src
 

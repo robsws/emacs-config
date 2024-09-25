@@ -281,13 +281,22 @@
 (setq history-length 25)
 (savehist-mode 1)
 
-(when (not (file-directory-p "~/.emacs-backup-files"))
-  (make-directory "~/.emacs-backup-files/"))
-(setq temporary-file-directory "~/.emacs-backup-files/")
+;; create the directory if it doesn't exist
+(when (not (file-directory-p "~/.emacs-temp-files"))
+  (make-directory "~/.emacs-temp-files/"))
+(setq temporary-file-directory "~/.emacs-temp-files/")
+
+;; redirect backup files
 (setq backup-directory-alist
-  `((".*" . ,temporary-file-directory)))
+      `((".*" . ,temporary-file-directory)))
+
+;; redirect autosave files
 (setq auto-save-file-name-transforms
-  `((".*" ,temporary-file-directory t)))
+      `((".*" ,temporary-file-directory t)))
+
+;; redirect lock files
+(setq lock-file-name-transforms
+      `((".*" ,temporary-file-directory t)))
 
 (general-define-key :prefix "C-c"
                     "c" (lambda () (interactive) (find-file "~/emacs-config/config.org"))
@@ -411,7 +420,7 @@
 
 (general-define-key "C-c a" 'org-agenda)
 
-(setq org-agenda-file-regexp "\\`\\\([^.].*\\.org\\\|[0-9]\\\{8\\\}\\\(\\.gpg\\\)?\\\)\\'")
+(setq org-agenda-file-regexp "\\`[^.].*\\.org\\'")
 
 (setq org-agenda-window-setup 'current-window)
 
@@ -462,7 +471,7 @@
                     (org-agenda-sorting-strategy '(effort-up))
                     (org-agenda-prefix-format "%-6e %-30c")
                     (org-agenda-files
-                     (rostre/org-notes-files personal-notes-directory))))))
+                     (list (file-name-concat personal-notes-directory "journal.org")))))))
         ("r" "Reminders"
          ((tags-todo "reminder"
                      ((org-agenda-prefix-format "%-6e %-30c")))))
@@ -583,6 +592,26 @@
 
 (add-to-list 'auto-mode-alist '("\\.rs\\'" . rust-ts-mode))
 
+(use-package dired
+  :ensure nil
+  :commands (dired dired-jump)
+  :bind (("C-x C-j" . dired-jump))
+  (:map dired-mode-map
+        ;; b goes up to parent dir
+        ("b" . 'dired-up-directory)
+        ;; N creates new file
+        ("N" . 'find-file))
+  :config
+  (require 'dired-x)
+  :custom
+  ;; Use gls for driving dired on mac
+  ((when system-type 'darwin
+         (insert-directory-program "gls"))
+   (dired-use-ls-dired t)
+   ;; Put all the directories at the top, hide backup files
+   (dired-listing-switches "-aghoB --group-directories-first")
+   (delete-by-moving-to-trash t)))
+
 (use-package vterm
   :commands vterm
   :config
@@ -592,10 +621,6 @@
   (general-define-key "C-c v" 'multi-vterm))
 
 (use-package multi-vterm)
-
-(use-package dirvish
-  :config
-  (dirvish-override-dired-mode))
 
 (defalias 'rostre/macro/record-feedback
   (kmacro "C-c d c C-k t e a m - l o g b o o k <return> n"))
@@ -661,3 +686,15 @@
     erc-auto-query 'bury)
 
 (use-package speed-type)
+(custom-set-variables
+ ;; custom-set-variables was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ '(org-agenda-files '("/home/robstreeting/work_notes/journal.org")))
+(custom-set-faces
+ ;; custom-set-faces was added by Custom.
+ ;; If you edit it by hand, you could mess it up, so be careful.
+ ;; Your init file should contain only one such instance.
+ ;; If there is more than one, they won't work right.
+ )
