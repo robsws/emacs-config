@@ -92,14 +92,14 @@
                     :height rostre/font-size)
 
 (defun rostre/org-faces ()
-      (set-face-attribute 'org-document-title nil :height 1.4)
-      (set-face-attribute 'org-todo nil :height 1.0)
-      (set-face-attribute 'org-level-1 nil :height 1.3)
-      (set-face-attribute 'org-level-2 nil :height 1.2)
-      (set-face-attribute 'org-level-3 nil :height 1.2)
-      (set-face-attribute 'org-level-4 nil :height 1.2)
-      (set-face-attribute 'org-level-5 nil :height 1.2)
-      (set-face-attribute 'org-level-6 nil :height 1.2))
+  (set-face-attribute 'org-document-title nil :height 1.4)
+  (set-face-attribute 'org-todo nil :height 1.0)
+  (set-face-attribute 'org-level-1 nil :height 1.3)
+  (set-face-attribute 'org-level-2 nil :height 1.2)
+  (set-face-attribute 'org-level-3 nil :height 1.2)
+  (set-face-attribute 'org-level-4 nil :height 1.2)
+  (set-face-attribute 'org-level-5 nil :height 1.2)
+  (set-face-attribute 'org-level-6 nil :height 1.2))
 
 (add-hook 'org-mode-hook 'rostre/org-faces)
 
@@ -465,13 +465,7 @@
                      ((org-agenda-overriding-header "Create Jira Cards")
                       (org-agenda-prefix-format "%-6e %-30c")
                       (org-agenda-files
-                       (rostre/org-notes-files work-notes-directory))))
-          (tags-todo "-SCHEDULED>\"<2000-01-01 Sat>\""
-                     ((org-agenda-overriding-header "Personal")
-                      (org-agenda-sorting-strategy '(effort-up))
-                      (org-agenda-prefix-format "%-6e %-30c")
-                      (org-agenda-files
-                       (list (file-name-concat personal-notes-directory "journal.org")))))))
+                       (rostre/org-notes-files work-notes-directory))))))
         ("r" "Reminders"
          ((tags-todo "reminder"
                      ((org-agenda-prefix-format "%-6e %-30c")))))
@@ -483,6 +477,15 @@
                    (org-agenda-entry-types '(:deadline))
                    (org-agenda-show-all-dates nil)
                    (org-deadline-warning-days 0)))))
+        ("e" "Personal Projects"
+         ((todo "TODO"
+               ((org-agenda-overriding-header "TODOs")
+                (org-agenda-files
+                 (list (file-name-concat personal-notes-directory "journal.org")))))
+          (todo "TODO"
+               ((org-agenda-overriding-header "Ideas")
+                (org-agenda-files
+                 (list (file-name-concat personal-notes-directory "miniprojects.org")))))))
         ("f" "Fun"
          ((todo "TODO"
                 ((org-agenda-overriding-header "Movies")
@@ -624,14 +627,13 @@
         ("N" . 'find-file))
   :config
   (require 'dired-x)
-  :custom
   ;; Use gls for driving dired on mac
-  ((when system-type 'darwin
-         (insert-directory-program "gls"))
-   (dired-use-ls-dired t)
-   ;; Put all the directories at the top, hide backup files
-   (dired-listing-switches "-aghoB --group-directories-first")
-   (delete-by-moving-to-trash t)))
+  (when system-type 'darwin
+        (setq insert-directory-program "gls"))
+  (setq dired-use-ls-dired t)
+  ;; Put all the directories at the top, hide backup files
+  (setq dired-listing-switches "-aghoB --group-directories-first")
+  (setq delete-by-moving-to-trash t))
 
 (use-package vterm
   :commands vterm
@@ -675,15 +677,13 @@
   (interactive)
   (let ((person-tag
          (completing-read "1-1 for person: " (org-get-buffer-tags)))
-        (week-ago
-         (format-time-string "%Y-%m-%d"
-                             (days-to-time
-                              (-
-                               (- (time-to-days (current-time)) 7)
-                               (time-to-days 0))))))
+        (min-time
+         (with-temp-buffer
+           (org-time-stamp nil)
+           (buffer-string))))
     (org-match-sparse-tree
      nil
-     (concat "+" person-tag "+CREATED>=\"<" week-ago ">\"|+downflow+CREATED>=\"<" week-ago ">\""))))
+     (concat "+" person-tag "+CREATED>=\"" min-time "\"|+downflow+CREATED>=\"" min-time "\""))))
 
 (general-define-key "C-c f o" 'rostre/filter-for-one-to-one-meeting)
 
