@@ -103,6 +103,14 @@
 
 (add-hook 'org-mode-hook 'rostre/org-faces)
 
+(custom-set-faces
+;; custom-set-faces was added by Custom.
+;; If you edit it by hand, you could mess it up, so be careful.
+;; Your init file should contain only one such instance.
+;; If there is more than one, they won't work right.
+'(bold ((t (:foreground "#6e94b9" :weight bold))))
+'(italic ((t (:foreground "#f7e3af" :slant italic)))))
+
 ;; Remove title bar on Mac
 (when (eq system-type 'darwin)
   (add-to-list 'default-frame-alist '(undecorated-round . t)))
@@ -362,7 +370,9 @@
     ("T" "Personal Task" entry (file+headline "~/synced_notes/journal.org" "personal journal")
      "\n* TODO [#%^{Priority: |A|B|C|D|E}] %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
     ("N" "Personal Note" entry (file+headline "~/synced_notes/journal.org" "personal journal")
-     "\n* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)))
+     "\n* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
+    ("C" "Chore" entry (file+headline "~/synced_notes/chores.org" "chores")
+     "\n* TODO [#%^{Priority: |A|B|C|D|E}] %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n")))
 
 (general-define-key "C-c f c" 'org-capture)
 
@@ -448,20 +458,25 @@
                       (org-deadline-warning-days 14)
                       (org-agenda-span 'day)
                       (org-agenda-start-with-log-mode '(state clock))
-                      (org-agenda-prefix-format "%-10t %-12s %-6e")))
-          (tags-todo "-create_jira_card+PRIORITY=\"A\"-SCHEDULED>\"<2000-01-01 Sat>\""
+                      (org-agenda-prefix-format "%-30b %-10t %-12s %-6e")
+                      (org-agenda-files org-agenda-files)))
+          (tags-todo "goal"
+                     ((org-agenda-overriding-header "Goals")
+                      (org-agenda-files
+                       (rostre/org-notes-files work-notes-directory))))
+          (tags-todo "-create_jira_card&+PRIORITY=\"A\"&-SCHEDULED>\"<2000-01-01 Sat>\""
                      ((org-agenda-overriding-header "Do Now")
                       (org-agenda-sorting-strategy '(effort-up))
                       (org-agenda-prefix-format "%-6e %-30c")
                       (org-agenda-files
                        (rostre/org-notes-files work-notes-directory))))
-          (tags-todo "-create_jira_card+PRIORITY=\"B\"-SCHEDULED>\"<2000-01-01 Sat>\""
+          (tags-todo "-create_jira_card&+PRIORITY=\"B\"&-SCHEDULED>\"<2000-01-01 Sat>\""
                      ((org-agenda-overriding-header "Do Later")
                       (org-agenda-sorting-strategy '(effort-up))
                       (org-agenda-prefix-format "%-6e %-30c")
                       (org-agenda-files
                        (rostre/org-notes-files work-notes-directory))))
-          (tags-todo "create_jira_card-SCHEDULED>\"<2000-01-01 Sat>\""
+          (tags-todo "create_jira_card&-SCHEDULED>\"<2000-01-01 Sat>\""
                      ((org-agenda-overriding-header "Create Jira Cards")
                       (org-agenda-prefix-format "%-6e %-30c")
                       (org-agenda-files
@@ -612,9 +627,9 @@
 (use-package jsonrpc) ;; dependency
 
 (use-package dape
-  :after jsonrpc
-  :config
-  (setq completion-in-region-function 'corfu))
+   :after jsonrpc
+   :config
+   (setq completion-in-region-function 'corfu))
 
 (add-to-list 'auto-mode-alist '("\\.rs\\'" . rust-ts-mode))
 
@@ -631,7 +646,7 @@
   (require 'dired-x)
   ;; Use gls for driving dired on mac
   (when (eq system-type 'darwin)
-        (setq insert-directory-program "gls"))
+    (setq insert-directory-program "gls"))
   (setq dired-use-ls-dired t)
   ;; Put all the directories at the top, hide backup files
   (setq dired-listing-switches "-aghoB --group-directories-first")

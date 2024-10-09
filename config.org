@@ -13,6 +13,7 @@ Various things need installing external to this configuration before it'll all w
 - =vterm= won't work unless =libtool= and =cmake= are installed to the OS.
 - On Mac, =coreutils= needs to be installed in the OS before =gls= can be used. =gls= is the GNU ls, which is just "ls" on gnu/linux systems.
 - =curl= is a requirement for =ob-http= to work.
+- =terminal-notifier= is a command line tool for creating mac banner notifications, and is required for notifications from emacs to work on mac.
 - =gdb= is needed for c, c++, and rust debugging with =dape=.
   
 ** lsp servers
@@ -265,6 +266,25 @@ We can customize specific font-faces for certain contexts as well. Mainly this i
 	(set-face-attribute 'org-level-6 nil :height 1.2))
 
   (add-hook 'org-mode-hook 'rostre/org-faces)
+
+#+end_src
+
+*** custom faces
+:PROPERTIES:
+:CREATED:  [2024-10-04 14:58:57]
+:END:
+
+This section contains changes made through =M-x customize-face=, which is a convenient face to modify the face of some text at point. Only one of these sections should exist in the config.
+
+#+begin_src emacs-lisp
+
+  (custom-set-faces
+  ;; custom-set-faces was added by Custom.
+  ;; If you edit it by hand, you could mess it up, so be careful.
+  ;; Your init file should contain only one such instance.
+  ;; If there is more than one, they won't work right.
+  '(bold ((t (:foreground "#6e94b9" :weight bold))))
+  '(italic ((t (:foreground "#f7e3af" :slant italic)))))
 
 #+end_src
 
@@ -843,7 +863,9 @@ Capture templates allow quickly adding segments to org files from anywhere. We c
       ("T" "Personal Task" entry (file+headline "~/synced_notes/journal.org" "personal journal")
        "\n* TODO [#%^{Priority: |A|B|C|D|E}] %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
       ("N" "Personal Note" entry (file+headline "~/synced_notes/journal.org" "personal journal")
-       "\n* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)))
+       "\n* %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n" :empty-lines-before 1)
+      ("C" "Chore" entry (file+headline "~/synced_notes/chores.org" "chores")
+       "\n* TODO [#%^{Priority: |A|B|C|D|E}] %?\n:PROPERTIES:\n:CREATED: %U\n:END:\n\n")))
 
   (general-define-key "C-c f c" 'org-capture)
 
@@ -1039,20 +1061,25 @@ The Fun view shows all of my personal lists of books/tv shows/games I want to lo
                         (org-deadline-warning-days 14)
                         (org-agenda-span 'day)
                         (org-agenda-start-with-log-mode '(state clock))
-                        (org-agenda-prefix-format "%-10t %-12s %-6e")))
-            (tags-todo "-create_jira_card+PRIORITY=\"A\"-SCHEDULED>\"<2000-01-01 Sat>\""
+                        (org-agenda-prefix-format "%-30b %-10t %-12s %-6e")
+                        (org-agenda-files org-agenda-files)))
+            (tags-todo "goal"
+                       ((org-agenda-overriding-header "Goals")
+                        (org-agenda-files
+                         (rostre/org-notes-files work-notes-directory))))
+            (tags-todo "-create_jira_card&+PRIORITY=\"A\"&-SCHEDULED>\"<2000-01-01 Sat>\""
                        ((org-agenda-overriding-header "Do Now")
                         (org-agenda-sorting-strategy '(effort-up))
                         (org-agenda-prefix-format "%-6e %-30c")
                         (org-agenda-files
                          (rostre/org-notes-files work-notes-directory))))
-            (tags-todo "-create_jira_card+PRIORITY=\"B\"-SCHEDULED>\"<2000-01-01 Sat>\""
+            (tags-todo "-create_jira_card&+PRIORITY=\"B\"&-SCHEDULED>\"<2000-01-01 Sat>\""
                        ((org-agenda-overriding-header "Do Later")
                         (org-agenda-sorting-strategy '(effort-up))
                         (org-agenda-prefix-format "%-6e %-30c")
                         (org-agenda-files
                          (rostre/org-notes-files work-notes-directory))))
-            (tags-todo "create_jira_card-SCHEDULED>\"<2000-01-01 Sat>\""
+            (tags-todo "create_jira_card&-SCHEDULED>\"<2000-01-01 Sat>\""
                        ((org-agenda-overriding-header "Create Jira Cards")
                         (org-agenda-prefix-format "%-6e %-30c")
                         (org-agenda-files
@@ -1334,9 +1361,9 @@ There is a more established package called =dap-mode= for providing a debugging 
   (use-package jsonrpc) ;; dependency
 
   (use-package dape
-    :after jsonrpc
-    :config
-    (setq completion-in-region-function 'corfu))
+     :after jsonrpc
+     :config
+     (setq completion-in-region-function 'corfu))
 
 #+end_src
 
@@ -1371,7 +1398,7 @@ Sticking with good old =dired=, although we configure it with some quality of li
     (require 'dired-x)
     ;; Use gls for driving dired on mac
     (when (eq system-type 'darwin)
-          (setq insert-directory-program "gls"))
+      (setq insert-directory-program "gls"))
     (setq dired-use-ls-dired t)
     ;; Put all the directories at the top, hide backup files
     (setq dired-listing-switches "-aghoB --group-directories-first")
