@@ -612,7 +612,9 @@
 (use-package jsonrpc) ;; dependency
 
 (use-package dape
-  :after jsonrpc)
+  :after jsonrpc
+  :config
+  (setq completion-in-region-function 'corfu))
 
 (add-to-list 'auto-mode-alist '("\\.rs\\'" . rust-ts-mode))
 
@@ -628,7 +630,7 @@
   :config
   (require 'dired-x)
   ;; Use gls for driving dired on mac
-  (when system-type 'darwin
+  (when (eq system-type 'darwin)
         (setq insert-directory-program "gls"))
   (setq dired-use-ls-dired t)
   ;; Put all the directories at the top, hide backup files

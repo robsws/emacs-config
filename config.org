@@ -13,7 +13,8 @@ Various things need installing external to this configuration before it'll all w
 - =vterm= won't work unless =libtool= and =cmake= are installed to the OS.
 - On Mac, =coreutils= needs to be installed in the OS before =gls= can be used. =gls= is the GNU ls, which is just "ls" on gnu/linux systems.
 - =curl= is a requirement for =ob-http= to work.
-
+- =gdb= is needed for c, c++, and rust debugging with =dape=.
+  
 ** lsp servers
 
 The python LSP server is [[https://emacs-lsp.github.io/lsp-mode/page/lsp-pylsp/][pylsp]]. I use the =black= formatter to style the code.
@@ -1333,7 +1334,9 @@ There is a more established package called =dap-mode= for providing a debugging 
   (use-package jsonrpc) ;; dependency
 
   (use-package dape
-    :after jsonrpc)
+    :after jsonrpc
+    :config
+    (setq completion-in-region-function 'corfu))
 
 #+end_src
 
@@ -1367,7 +1370,7 @@ Sticking with good old =dired=, although we configure it with some quality of li
     :config
     (require 'dired-x)
     ;; Use gls for driving dired on mac
-    (when system-type 'darwin
+    (when (eq system-type 'darwin)
           (setq insert-directory-program "gls"))
     (setq dired-use-ls-dired t)
     ;; Put all the directories at the top, hide backup files
