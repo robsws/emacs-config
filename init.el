@@ -196,9 +196,9 @@
   ;; use super-Space to use orderless search in corfu completions
   (:map corfu-map ("s-SPC" . corfu-insert-separator))
   :config
-  (corfu-cycle t) ;; cycle selection box
-  (corfu-auto t) ;; automatically try to complete
-  (corfu-preview-current t)
+  (setq corfu-cycle t) ;; cycle selection box
+  (setq corfu-auto t) ;; automatically try to complete
+  (setq corfu-preview-current t)
   (global-corfu-mode)
   (corfu-popupinfo-mode))
 

@@ -37,6 +37,8 @@ Rust requires =rust-analyzer=. That can be downloaded and compiled from source l
 
 #+end_src
 
+C and C++ code uses =clangd=.
+
 * postrequisites
 
 Here's some things that might need to be done after the config has finished loading.
@@ -494,9 +496,9 @@ If inside a buffer, we want to include a space in the search term for the comple
     ;; use super-Space to use orderless search in corfu completions
     (:map corfu-map ("s-SPC" . corfu-insert-separator))
     :config
-    (corfu-cycle t) ;; cycle selection box
-    (corfu-auto t) ;; automatically try to complete
-    (corfu-preview-current t)
+    (setq corfu-cycle t) ;; cycle selection box
+    (setq corfu-auto t) ;; automatically try to complete
+    (setq corfu-preview-current t)
     (global-corfu-mode)
     (corfu-popupinfo-mode))
 
@@ -1128,13 +1130,6 @@ The Fun view shows all of my personal lists of books/tv shows/games I want to lo
 
 #+end_src
 
-#+RESULTS:
-| j | Dashboard         | ((agenda  ((org-deadline-warning-days 14) (org-agenda-span 'day) (org-agenda-start-with-log-mode '(state clock)) (org-agenda-prefix-format %-10t %-12s %-6e))) (tags-todo -create_jira_card+PRIORITY="A"-SCHEDULED>"<2000-01-01 Sat>" ((org-agenda-overriding-header Do Now) (org-agenda-sorting-strategy '(effort-up)) (org-agenda-prefix-format %-6e %-30c) (org-agenda-files (rostre/org-notes-files work-notes-directory)))) (tags-todo -create_jira_card+PRIORITY="B"-SCHEDULED>"<2000-01-01 Sat>" ((org-agenda-overriding-header Do Later) (org-agenda-sorting-strategy '(effort-up)) (org-agenda-prefix-format %-6e %-30c) (org-agenda-files (rostre/org-notes-files work-notes-directory)))) (tags-todo create_jira_card-SCHEDULED>"<2000-01-01 Sat>" ((org-agenda-overriding-header Create Jira Cards) (org-agenda-prefix-format %-6e %-30c) (org-agenda-files (rostre/org-notes-files work-notes-directory))))) |
-| r | Reminders         | ((tags-todo reminder ((org-agenda-prefix-format %-6e %-30c))))                                                                       |
-| d | Deadlines         | ((agenda Deadlines ((org-agenda-overriding-header Deadlines) (org-agenda-span 'month) (org-agenda-time-grid nil) (org-agenda-entry-types '(:deadline)) (org-agenda-show-all-dates nil) (org-deadline-warning-days 0)))) |
-| e | Personal Projects | ((todo TODO ((org-agenda-overriding-header TODOs) (org-agenda-files (list (file-name-concat personal-notes-directory journal.org))))) (todo TODO ((org-agenda-overriding-header Ideas) (org-agenda-files (list (file-name-concat personal-notes-directory miniprojects.org)))))) |
-| f | Fun               | ((todo TODO ((org-agenda-overriding-header Movies) (org-agenda-files (list (file-name-concat personal-notes-directory movies.org))))) (todo TODO ((org-agenda-overriding-header Games) (org-agenda-files (list (file-name-concat personal-notes-directory games.org))))) (todo TODO ((org-agenda-overriding-header Books) (org-agenda-files (list (file-name-concat personal-notes-directory books.org))))) (todo TODO ((org-agenda-overriding-header Blog Ideas) (org-agenda-files (list (file-name-concat personal-notes-directory blogs.org))))) (todo TODO ((org-agenda-overriding-header Project Ideas) (org-agenda-files (list (file-name-concat personal-notes-directory miniprojects.org)))))) |
-
 ** org-babel
 
 org-babel is a tool for literate programming, which means code blocks interspersed with documentation, exactly like this configuration file.
@@ -1516,8 +1511,6 @@ TODO - redo this with elpaca
 ** org-mode
 
 There's a bunch of specific org-mode functionality I've built specifically for work as a manager. I don't think I'm likely to use this outside of work.
-
-This filter gets all entries related to a specific person, plus everything tagged with "downflow", for the last week.
 
 #+begin_src emacs-lisp
 
