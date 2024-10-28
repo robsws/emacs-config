@@ -570,6 +570,10 @@
 (use-package yasnippet-snippets
   :after yasnippet)
 
+(use-package consult-yasnippet
+  :config
+  (general-define-key "C-c _" 'consult-yasnippet))
+
 (setq treesit-language-source-alist
  '((bash "https://github.com/tree-sitter/tree-sitter-bash" "v0.20.5")
    (c "https://github.com/tree-sitter/tree-sitter-c" "v0.20.7")

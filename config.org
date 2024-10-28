@@ -15,6 +15,7 @@ Various things need installing external to this configuration before it'll all w
 - =curl= is a requirement for =ob-http= to work.
 - =terminal-notifier= is a command line tool for creating mac banner notifications, and is required for notifications from emacs to work on mac.
 - =gdb= is needed for c, c++, and rust debugging with =dape=.
+- =ripgrep= is required for =consult-ripgrep=.
   
 ** lsp servers
 
@@ -1260,6 +1261,10 @@ We can further customize =indent-bars= to activate only in the point's scope. By
 
   (use-package yasnippet-snippets
     :after yasnippet)
+
+  (use-package consult-yasnippet
+    :config
+    (general-define-key "C-c _" 'consult-yasnippet))
 
 #+end_src
 
